@@ -7,7 +7,6 @@ import '../controllers/template_controller.dart';
 import '../widgets/command_panel.dart';
 import '../widgets/telemetry_chart.dart';
 import '../widgets/stored_topic_data.dart';
-import '../../../workspace/presentation/workspace_forms.dart';
 
 class LiveTemplatePage extends StatelessWidget {
   const LiveTemplatePage({super.key, required this.controller});
@@ -49,18 +48,6 @@ class LiveTemplatePage extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               SelectableText('${rule.topic} · ${rule.permission}'),
-              TextButton.icon(
-                onPressed: () => showDialog<void>(
-                  context: context,
-                  builder: (_) => WorkspaceForm(
-                    controller: controller,
-                    topic: true,
-                    rule: rule,
-                  ),
-                ),
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Edit topic'),
-              ),
               const SizedBox(height: 16),
               if (rule.isStored)
                 StoredTopicData(

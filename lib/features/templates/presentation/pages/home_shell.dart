@@ -6,7 +6,6 @@ import 'activity_page.dart';
 import '../../../workspace/presentation/workspace_header.dart';
 import 'live_template_page.dart';
 import 'topic_dashboard_page.dart';
-import 'device_list_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.controller});
@@ -69,9 +68,7 @@ class _HomeShellState extends State<HomeShell> {
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 900;
             final pages = <Widget>[
-              controller.deviceDetailsOpen
-                  ? TopicDashboardPage(controller: controller)
-                  : DeviceListPage(controller: controller),
+              TopicDashboardPage(controller: controller),
               LiveTemplatePage(controller: controller),
               ActivityPage(controller: controller),
             ];

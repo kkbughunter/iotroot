@@ -33,7 +33,8 @@ const tokens = {
   'expiresInSeconds': 3600
 };
 
-ApiClient fixtureApi({MemoryStore? store}) => ApiClient(
+ApiClient fixtureApi({MemoryStore? store, String secondUsername = 'device-two'}) =>
+    ApiClient(
     store: store ?? MemoryStore(),
     client: MockClient((request) async {
       switch (request.url.path) {
@@ -53,7 +54,7 @@ ApiClient fixtureApi({MemoryStore? store}) => ApiClient(
             {
               'id': 2,
               'clientId': 'client-two',
-              'username': 'device-two',
+              'username': secondUsername,
               'mountpoint': ''
             },
           ]);

@@ -178,40 +178,17 @@ class _ConnectionDialogState extends State<ConnectionDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Choose your client and sign in once. You can change these details in Client settings.',
+                  'Sign in once with this app device\'s client credentials. You can change them later in Client settings.',
                 ),
                 const SizedBox(height: 20),
-                DropdownButtonFormField<int>(
-                  initialValue: widget.controller.selectedDevice?.id,
-                  isExpanded: true,
+                InputDecorator(
                   decoration: const InputDecoration(labelText: 'Device'),
-                  items: widget.controller.devices
-                      .map(
-                        (d) => DropdownMenuItem(
-                          value: d.id,
-                          child: Text(
-                            '${d.name} · ${d.clientId}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: _loading || _saving
-                      ? null
-                      : (id) async {
-                          if (id == null) return;
-                          setState(() {
-                            _loading = true;
-                            _error = null;
-                          });
-                          await widget.controller.selectDevice(
-                            widget.controller.devices.firstWhere(
-                              (d) => d.id == id,
-                            ),
-                            autoConnect: false,
-                          );
-                          if (mounted) await _loadCredentials();
-                        },
+                  child: Text(
+                    widget.controller.selectedDevice == null
+                        ? 'No app device'
+                        : '${widget.controller.selectedDevice!.name} · ${widget.controller.selectedDevice!.clientId}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextFormField(

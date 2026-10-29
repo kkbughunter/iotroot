@@ -20,8 +20,9 @@ void main() {
   });
   tearDown(() => controller.dispose());
 
-  test('loads account devices and rules with no synthetic telemetry', () {
-    expect(controller.devices.length, 2);
+  test('loads only the app device and its rules with no synthetic telemetry',
+      () {
+    expect(controller.devices.length, 1);
     expect(controller.selectedDevice!.clientId, 'client-one');
     expect(controller.rules.length, 3);
     expect(controller.events, isEmpty);
@@ -73,22 +74,32 @@ void main() {
     controller.setPublishTopic('commands/light');
     expect(controller.canSend, isTrue);
   });
-  test('device changes and logout disconnect and clear previous data',
+  test('the app device is the one whose username matches the account email',
       () async {
+    final emailStore = MemoryStore();
+    final emailController = TemplateController(TemplateRepository(),
+        api: fixtureApi(store: emailStore, secondUsername: 'user@example.com'),
+        broker: FakeBroker());
+    addTearDown(emailController.dispose);
+    await emailController.initialize();
+    await emailController.login(
+        'https://example.com', 'User@Example.com', 'secret');
+    expect(emailController.devices.single.clientId, 'client-two');
+    expect(emailController.selectedDevice!.id, 2);
+  });
+  test('logout disconnects and clears previous data', () async {
     await controller.connect('mqtt-secret', controller.brokerSettings);
     broker.receive('room/climate', '42');
-    await controller.selectDevice(controller.devices[1]);
-    expect(controller.connected, isFalse);
-    expect(controller.latestMessage, isNull);
-    expect(controller.metricHistory.values.every((p) => p.isEmpty), isTrue);
+    expect(controller.latestMessage, isNotNull);
     await controller.logout();
+    expect(controller.connected, isFalse);
     expect(controller.authenticated, isFalse);
     expect(controller.events, isEmpty);
     expect(controller.devices, isEmpty);
+    expect(controller.metricHistory.values.every((p) => p.isEmpty), isTrue);
   });
-  test('restores the selected client, edited username and password on restart',
+  test('restores the app device, edited username and password on restart',
       () async {
-    await controller.selectDevice(controller.devices[1]);
     expect(controller.needsClientSetup, isTrue);
     expect(
         await controller.connect('saved-secret', controller.brokerSettings,
@@ -99,11 +110,12 @@ void main() {
         api: fixtureApi(store: store), broker: restoredBroker);
     addTearDown(restored.dispose);
     await restored.initialize();
-    expect(restored.selectedDevice!.id, 2);
+    expect(restored.devices.single.id, 1);
+    expect(restored.selectedDevice!.id, 1);
     expect(restored.connected, isTrue);
     expect(restored.needsClientSetup, isFalse);
     expect(restoredBroker.connects, 1);
-    expect(restoredBroker.device!.clientId, 'client-two');
+    expect(restoredBroker.device!.clientId, 'client-one');
     expect(restoredBroker.device!.username, 'updated-user');
     expect(restoredBroker.password, 'saved-secret');
     expect(restoredBroker.settings!.host, 'localhost');

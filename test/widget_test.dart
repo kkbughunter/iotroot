@@ -33,15 +33,14 @@ void main() {
           find.widgetWithText(TextFormField, 'Client password'), 'mqtt-secret');
       await tester.tap(find.widgetWithText(FilledButton, 'Connect'));
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('device-card:1')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('device-card:1')));
-      await tester.pumpAndSettle();
+      expect(find.text('All devices'), findsNothing);
+      expect(find.text('Add topic'), findsNothing);
       expect(find.text('Set up template'), findsNothing);
       expect(find.byKey(const ValueKey('topic-card:11')), findsOneWidget);
       expect(find.byKey(const ValueKey('topic-card:12')), findsOneWidget);
       expect(find.byKey(const ValueKey('topic-card:13')), findsOneWidget);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.byKey(const ValueKey('topic-details:11')));
+      await tester.tap(find.byKey(const ValueKey('topic-card:11')));
       await tester.pumpAndSettle();
       expect(find.text('Topic details'), findsWidgets);
       await tester.tap(find.text('Use this template'));
@@ -57,7 +56,8 @@ void main() {
       expect(broker.published.keys, contains('room/climate'));
       await tester.tap(find.text('My home').last);
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('send-topic:11')), findsOneWidget);
+      expect(find.byKey(const ValueKey('topic-card:11')), findsOneWidget);
+      expect(find.byKey(const ValueKey('send-topic:11')), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('Activity').last);
       await tester.pumpAndSettle();

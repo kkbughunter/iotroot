@@ -47,8 +47,8 @@ class TemplateController extends ChangeNotifier {
   String? error, historyError;
   String connectionStatus = 'Disconnected';
   int pageIndex = 0;
-  bool deviceDetailsOpen = false;
   TemplateCategory? categoryFilter;
+  // Only the app device is loaded; the app never lists or creates other devices.
   List<Device> devices = [];
   List<TopicRule> rules = [];
   Map<int, Map<String, dynamic>> statuses = {};
@@ -59,6 +59,8 @@ class TemplateController extends ChangeNotifier {
   final Map<String, List<TelemetryPoint>> metricHistory = {};
   final List<TemplateEvent> events = [];
   final Map<int, List<BrokerMessage>> _readings = {};
+  // Newest stored message per stored topic, shown on the home cards.
+  final Map<int, Map<String, dynamic>> _latestStored = {};
   Map<String, dynamic> _preferences = {};
   List<Map<String, dynamic>> storedMessages = [];
   int storedTotal = 0, _storedPage = 0, _storedPages = 0;
@@ -138,7 +140,7 @@ class TemplateController extends ChangeNotifier {
     try {
       final data = await api.request('/api/devices');
       if (generation != _workspace || _disposed) return;
-      devices = (data as List)
+      final all = (data as List)
           .map((d) => Device.fromJson(Map<String, dynamic>.from(d as Map)))
           .toList();
       final saved = await api.store.read(_settingsKey);
@@ -146,6 +148,7 @@ class TemplateController extends ChangeNotifier {
       _preferences = saved == null
           ? {}
           : Map<String, dynamic>.from(jsonDecode(saved) as Map);
+      devices = [?_appDeviceFrom(all)];
       try {
         final data =
             await api.request('/api/devices/connection-status') as List;
@@ -162,15 +165,7 @@ class TemplateController extends ChangeNotifier {
             'Devices loaded, but broker details are unavailable: ${e.message}';
       }
       if (generation != _workspace || _disposed) return;
-      final device =
-          devices
-              .where(
-                (d) =>
-                    d.id ==
-                    (selectedDevice?.id ?? _preferences['selectedDevice']),
-              )
-              .firstOrNull ??
-          devices.firstOrNull;
+      final device = devices.firstOrNull;
       if (device != null) {
         await selectDevice(device);
       } else {
@@ -189,6 +184,18 @@ class TemplateController extends ChangeNotifier {
     }
   }
 
+  // The app device is the client the account signs in with. The backend creates
+  // it at signup with username = account email, so prefer that match, then the
+  // device used last time, then the first device on the account.
+  Device? _appDeviceFrom(List<Device> all) {
+    final email = api.email.trim().toLowerCase();
+    return all
+            .where((d) => d.username.trim().toLowerCase() == email)
+            .firstOrNull ??
+        all.where((d) => d.id == _preferences['selectedDevice']).firstOrNull ??
+        all.firstOrNull;
+  }
+
   Future<void> selectDevice(Device device, {bool autoConnect = true}) async {
     disconnect();
     final selection = ++_deviceSelection;
@@ -203,6 +210,7 @@ class TemplateController extends ChangeNotifier {
     sending = false;
     rules = [];
     _readings.clear();
+    _latestStored.clear();
     metricHistory.clear();
     storedMessages = [];
     historyError = null;
@@ -215,6 +223,7 @@ class TemplateController extends ChangeNotifier {
           .map((r) => TopicRule.fromJson(Map<String, dynamic>.from(r as Map)))
           .toList();
       if (rules.isNotEmpty) selectRule(rules.first);
+      unawaited(refreshLatestStored());
       _preferences['selectedDevice'] = device.id;
       await _savePreferences();
       if (selection != _deviceSelection || _disposed) return;
@@ -293,80 +302,6 @@ class TemplateController extends ChangeNotifier {
   void setPublishTopic(String value) {
     publishTopic = value.trim();
     unawaited(_saveRule({'publishTopic': publishTopic}));
-    _notify();
-  }
-
-  Future<void> openDevice(Device device) async {
-    deviceDetailsOpen = true;
-    pageIndex = 0;
-    if (selectedDevice?.id != device.id) {
-      await selectDevice(device);
-    }
-    _notify();
-  }
-
-  void showDevices() {
-    deviceDetailsOpen = false;
-    pageIndex = 0;
-    _notify();
-  }
-
-  Future<void> saveDevice(
-    Map<String, dynamic> payload, {
-    Device? device,
-  }) async {
-    final generation = _workspace;
-    final data = await api.request(
-      device == null ? '/api/devices' : '/api/devices/${device.id}',
-      method: device == null ? 'POST' : 'PUT',
-      body: payload,
-    );
-    if (generation != _workspace || _disposed) return;
-    final saved = Device.fromJson(Map<String, dynamic>.from(data as Map));
-    devices = [...devices.where((d) => d.id != saved.id), saved];
-    if (selectedDevice?.id == saved.id) selectedDevice = saved;
-    if (device != null &&
-        (device.username != saved.username ||
-            payload.containsKey('password'))) {
-      _preferences['client:${saved.id}'] = {'username': saved.username};
-      if (selectedDevice?.id == saved.id) {
-        disconnect();
-        needsClientSetup = true;
-      }
-      if (payload.containsKey('password')) {
-        await api.store.delete('iotroot.mqtt.${api.accountKey}.${saved.id}');
-      }
-      await _savePreferences();
-    }
-    _notify();
-  }
-
-  Future<void> saveTopic(
-    Map<String, dynamic> payload, {
-    TopicRule? rule,
-  }) async {
-    final device = selectedDevice;
-    if (device == null) throw StateError('Choose a device first.');
-    final selection = _deviceSelection;
-    final data = await api.request(
-      '/api/devices/${device.id}/rules${rule == null ? '' : '/${rule.id}'}',
-      method: rule == null ? 'POST' : 'PUT',
-      body: payload,
-    );
-    if (selection != _deviceSelection || _disposed) return;
-    final saved = TopicRule.fromJson(Map<String, dynamic>.from(data as Map));
-    rules = [...rules.where((r) => r.id != saved.id), saved];
-    if (selectedRule?.id == saved.id || selectedRule == null) selectRule(saved);
-    // Reconnect with the new subscriptions when credentials are available.
-    final password = await savedPassword();
-    if (selection != _deviceSelection || _disposed) return;
-    if (connected &&
-        (rule == null ||
-            rule.topic != saved.topic ||
-            rule.permission != saved.permission)) {
-      disconnect();
-      if (password != null) await connect(password, brokerSettings);
-    }
     _notify();
   }
 
@@ -449,7 +384,6 @@ class TemplateController extends ChangeNotifier {
       rule.canPublish &&
       matchesTopic(rule.topic, destinationFor(rule));
   void openTopic(TopicRule rule) {
-    deviceDetailsOpen = true;
     selectRule(rule);
     pageIndex = 1;
     _notify();
@@ -681,6 +615,57 @@ class TemplateController extends ChangeNotifier {
     _notify();
   }
 
+  // Only the topic (or wildcard prefix) being shown is requested. Exact topics
+  // need one row; wildcards need a window because the prefix can match others.
+  Map<String, String> _topicQuery(TopicRule rule) => rule.wildcard
+      ? {'topicPrefix': rule.topic.split(RegExp(r'[+#]')).first}
+      : {'topic': rule.topic};
+
+  Future<void> refreshLatestStored() async {
+    final device = selectedDevice;
+    if (device == null) return;
+    final selection = _deviceSelection;
+    final generation = _workspace;
+    await Future.wait([
+      for (final rule in rules.where((r) => r.isStored))
+        _loadLatestStored(device, rule, selection, generation),
+    ]);
+    _notify();
+  }
+
+  Future<void> _loadLatestStored(
+    Device device,
+    TopicRule rule,
+    int selection,
+    int generation,
+  ) async {
+    try {
+      final data = await api.request(
+        '/api/store/messages',
+        query: {
+          'deviceId': '${device.id}',
+          ..._topicQuery(rule),
+          'size': rule.wildcard ? '50' : '1',
+        },
+      ) as Map;
+      if (selection != _deviceSelection || generation != _workspace) return;
+      final newest = (data['content'] as List)
+          .map((r) => Map<String, dynamic>.from(r as Map))
+          .where((r) => matchesTopic(rule.topic, r['topic'] as String? ?? ''))
+          .firstOrNull;
+      if (newest == null) {
+        _latestStored.remove(rule.id);
+      } else {
+        _latestStored[rule.id] = newest;
+      }
+    } catch (_) {
+      // Keep the last value on the card when a refresh fails.
+    }
+  }
+
+  Map<String, dynamic>? latestStoredFor(TopicRule rule) =>
+      _latestStored[rule.id];
+
   Future<void> loadHistory({bool more = false}) async {
     final rule = selectedRule;
     if (selectedDevice == null ||
@@ -703,9 +688,7 @@ class TemplateController extends ChangeNotifier {
         '/api/store/messages',
         query: {
           'deviceId': '${selectedDevice!.id}',
-          if (!rule.wildcard) 'topic': rule.topic,
-          if (rule.wildcard)
-            'topicPrefix': rule.topic.split(RegExp(r'[+#]')).first,
+          ..._topicQuery(rule),
           'page': '$_storedPage',
           'size': '200',
           'from': _historyTo!
@@ -750,6 +733,7 @@ class TemplateController extends ChangeNotifier {
     selectedDevice = null;
     selectedRule = null;
     _readings.clear();
+    _latestStored.clear();
     metricHistory.clear();
     events.clear();
     _preferences = {};
@@ -757,7 +741,6 @@ class TemplateController extends ChangeNotifier {
     needsClientSetup = false;
     storedMessages = [];
     pageIndex = 0;
-    deviceDetailsOpen = false;
     busy = false;
     connecting = false;
     sending = false;
