@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../controllers/template_controller.dart';
+import '../../../settings/presentation/settings_page.dart';
 import 'activity_page.dart';
 import '../../../workspace/presentation/workspace_header.dart';
-import 'live_template_page.dart';
 import 'topic_dashboard_page.dart';
 
 class HomeShell extends StatefulWidget {
@@ -18,7 +18,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   TemplateController get controller => widget.controller;
-  bool _prompted = false;
+  int? _promptedDeviceId;
   bool _dialogOpen = false;
 
   void _promptSetup() {
@@ -27,11 +27,11 @@ class _HomeShellState extends State<HomeShell> {
         controller.busy ||
         controller.loadingRules ||
         id == null ||
-        _prompted ||
+        _promptedDeviceId == id ||
         _dialogOpen) {
       return;
     }
-    _prompted = true;
+    _promptedDeviceId = id;
     _dialogOpen = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -49,12 +49,13 @@ class _HomeShellState extends State<HomeShell> {
       label: 'My home',
     ),
     NavigationDestination(
-      icon: Icon(Icons.monitor_heart_outlined),
-      label: 'Topic details',
-    ),
-    NavigationDestination(
       icon: Icon(Icons.swap_vert_rounded),
       label: 'Activity',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.settings_outlined),
+      selectedIcon: Icon(Icons.settings_rounded),
+      label: 'Settings',
     ),
   ];
 
@@ -69,8 +70,8 @@ class _HomeShellState extends State<HomeShell> {
             final wide = constraints.maxWidth >= 900;
             final pages = <Widget>[
               TopicDashboardPage(controller: controller),
-              LiveTemplatePage(controller: controller),
               ActivityPage(controller: controller),
+              SettingsPage(controller: controller),
             ];
 
             return Scaffold(
@@ -118,9 +119,13 @@ class _SideNavigation extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 240,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(right: BorderSide(color: AppTheme.line)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          right: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
       ),
       padding: const EdgeInsets.fromLTRB(18, 26, 18, 22),
       child: Column(
@@ -138,14 +143,14 @@ class _SideNavigation extends StatelessWidget {
             onTap: () => controller.setPage(0),
           ),
           _NavTile(
-            icon: Icons.monitor_heart_outlined,
-            label: 'Topic details',
+            icon: Icons.swap_vert_rounded,
+            label: 'Activity',
             selected: controller.pageIndex == 1,
             onTap: () => controller.setPage(1),
           ),
           _NavTile(
-            icon: Icons.swap_vert_rounded,
-            label: 'Activity',
+            icon: Icons.settings_outlined,
+            label: 'Settings',
             selected: controller.pageIndex == 2,
             onTap: () => controller.setPage(2),
           ),
@@ -153,7 +158,7 @@ class _SideNavigation extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppTheme.canvas,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -166,7 +171,7 @@ class _SideNavigation extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.ink,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -184,15 +189,15 @@ class _Brand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
-        Icon(Icons.hub_rounded, color: AppTheme.green, size: 27),
-        SizedBox(width: 10),
+        const Icon(Icons.hub_rounded, color: AppTheme.green, size: 27),
+        const SizedBox(width: 10),
         Flexible(
           child: Text(
             'IoTRoot',
             style: TextStyle(
-              color: AppTheme.ink,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
@@ -255,7 +260,9 @@ class _NavTile extends StatelessWidget {
                   child: Text(
                     label,
                     style: TextStyle(
-                      color: selected ? AppTheme.ink : AppTheme.muted,
+                      color: selected
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                     ),
                   ),

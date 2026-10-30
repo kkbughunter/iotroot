@@ -27,9 +27,7 @@ class _StoredTopicDataState extends State<StoredTopicData>
     WidgetsBinding.instance.addObserver(this);
     _timer = Timer.periodic(const Duration(seconds: 10), (_) {
       final controller = widget.controller;
-      if (_foreground &&
-          controller.pageIndex == 1 &&
-          controller.selectedRule?.isStored == true) {
+      if (_foreground && controller.selectedRule?.isStored == true) {
         unawaited(controller.loadHistory());
       }
     });
@@ -64,11 +62,36 @@ class _StoredTopicDataState extends State<StoredTopicData>
             ),
             IconButton(
               tooltip: 'Refresh',
-              onPressed:
-                  controller.loadingHistory ? null : controller.loadHistory,
+              onPressed: controller.loadingHistory
+                  ? null
+                  : controller.loadHistory,
               icon: const Icon(Icons.refresh),
             ),
           ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Last 30 minutes · topic view includes messages from every device.',
+          style: theme.textTheme.bodySmall,
+        ),
+        const SizedBox(height: 10),
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(
+              value: false,
+              icon: Icon(Icons.hub_outlined),
+              label: Text('All devices'),
+            ),
+            ButtonSegment(
+              value: true,
+              icon: Icon(Icons.memory_rounded),
+              label: Text('This device'),
+            ),
+          ],
+          selected: {controller.storedDeviceOnly},
+          onSelectionChanged: controller.loadingHistory
+              ? null
+              : (values) => controller.setStoredDeviceOnly(values.first),
         ),
         if (controller.loadingHistory) const LinearProgressIndicator(),
         if (controller.historyError != null)
@@ -79,7 +102,7 @@ class _StoredTopicDataState extends State<StoredTopicData>
         if (latest == null &&
             !controller.loadingHistory &&
             controller.historyError == null)
-          const Text('No messages in the last hour.'),
+          const Text('No messages in the last 30 minutes.'),
         if (latest != null) ...[
           _section(
             theme,
@@ -88,7 +111,7 @@ class _StoredTopicDataState extends State<StoredTopicData>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${_time(latest['receivedAt'])} · ${latest['topic']}',
+                  '${_deviceName(controller, latest)} · ${_time(latest['receivedAt'])} · ${latest['topic']}',
                   style: const TextStyle(fontSize: 12, color: AppTheme.muted),
                 ),
                 const SizedBox(height: 6),
@@ -151,7 +174,7 @@ class _StoredTopicDataState extends State<StoredTopicData>
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 2),
                     child: Text(
-                      '${_time(row['receivedAt'])}  ${jsonEncode(row['payload'])}',
+                      '${_deviceName(controller, row)} · ${_time(row['receivedAt'])}  ${jsonEncode(row['payload'])}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12),
@@ -175,6 +198,16 @@ class _StoredTopicDataState extends State<StoredTopicData>
   String _time(Object? value) =>
       DateTime.tryParse('$value')?.toLocal().toString().split('.').first ??
       '$value';
+
+  String _deviceName(TemplateController controller, Map<String, dynamic> row) {
+    final id = (row['deviceId'] as num?)?.toInt();
+    return controller.devices
+            .where((device) => device.id == id)
+            .firstOrNull
+            ?.name ??
+        row['clientId']?.toString() ??
+        'Device #${id ?? '?'}';
+  }
 
   Widget _section(ThemeData theme, String title, Widget child) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -236,10 +269,7 @@ class _GroupedBars extends StatelessWidget {
                 child: LinearProgressIndicator(value: item.value / maximum),
               ),
               const SizedBox(width: 8),
-              Text(
-                '${item.value}',
-                style: const TextStyle(fontSize: 12),
-              ),
+              Text('${item.value}', style: const TextStyle(fontSize: 12)),
             ],
           ),
       ],

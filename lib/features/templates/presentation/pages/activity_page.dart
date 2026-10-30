@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/app_theme.dart';
@@ -20,21 +18,14 @@ class ActivityPage extends StatelessWidget {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(24, 34, 24, 20),
           sliver: SliverToBoxAdapter(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 900),
-                child: PageHeader(
-                  eyebrow: 'Message stream',
-                  title: 'Send & receive activity',
-                  description: 'Latest 300 live messages and broker-acknowledged commands across this device’s topics.',
-                  trailing: controller.events.isEmpty
-                      ? null
-                      : TextButton.icon(
-                          onPressed: controller.clearEvents,
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          label: const Text('Clear'),
-                        ),
-                ),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: controller.events.isEmpty
+                    ? null
+                    : controller.clearEvents,
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Clear'),
               ),
             ),
           ),
@@ -76,6 +67,9 @@ class _EventCard extends StatelessWidget {
     final color = sent ? const Color(0xFF3C75C6) : AppTheme.green;
     return Card(
       child: ExpansionTile(
+        key: PageStorageKey<String>(
+          'activity:${event.direction.name}:${event.topic}:${event.time.microsecondsSinceEpoch}',
+        ),
         shape: const Border(),
         collapsedShape: const Border(),
         tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
@@ -129,8 +123,8 @@ class _EventCard extends StatelessWidget {
               color: const Color(0xFF18251F),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: SelectableText(
-              const JsonEncoder.withIndent('  ').convert(event.payload),
+            child: Text(
+              event.payload?.toString() ?? 'null',
               style: const TextStyle(
                 color: Color(0xFFB9EBD7),
                 fontFamily: 'monospace',

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../workspace/data/workspace_models.dart';
 import '../controllers/template_controller.dart';
+import 'topic_details_page.dart';
 
 class TopicDashboardPage extends StatefulWidget {
   const TopicDashboardPage({super.key, required this.controller});
@@ -52,7 +53,7 @@ class _TopicDashboardPageState extends State<TopicDashboardPage> {
               ? 4
               : width >= 700
               ? 3
-              : width >= 340
+              : width >= 280
               ? 2
               : 1;
           final cardWidth = (width - gap * (columns - 1)) / columns;
@@ -113,22 +114,64 @@ class _TopicCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final latest = _latest;
+    final power = controller.powerFor(rule);
     return Card(
       key: ValueKey('topic-card:${rule.id}'),
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: () => controller.openTopic(rule),
+        onTap: () {
+          controller.openTopic(rule);
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => TopicDetailsPage(controller: controller),
+            ),
+          );
+        },
         child: Padding(
           padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                rule.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    margin: const EdgeInsets.only(right: 7),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Icon(
+                      rule.isStored
+                          ? Icons.storage_rounded
+                          : Icons.sensors_rounded,
+                      size: 17,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  // Device name 
+                  Expanded(
+                    child: Text(
+                      rule.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  Transform.scale(
+                    scale: .78,
+                    child: Switch.adaptive(
+                      key: ValueKey('topic-power:${rule.id}'),
+                      value: power,
+                      onChanged: controller.canSendTopic(rule)
+                          ? (value) => controller.setTopicPower(rule, value)
+                          : null,
+                    ),
+                  ),
+                ],
               ),
+              // topic 
               Text(
                 rule.topic,
                 maxLines: 1,
@@ -136,6 +179,7 @@ class _TopicCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 11, color: AppTheme.muted),
               ),
               const SizedBox(height: 6),
+              // Data
               Text(
                 latest ?? 'No data',
                 maxLines: 2,
@@ -145,6 +189,7 @@ class _TopicCard extends StatelessWidget {
                   color: latest == null ? AppTheme.muted : AppTheme.ink,
                 ),
               ),
+              
             ],
           ),
         ),

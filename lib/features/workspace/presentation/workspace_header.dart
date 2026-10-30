@@ -8,7 +8,7 @@ class WorkspaceHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: Colors.white,
+    color: Theme.of(context).colorScheme.surface,
     child: Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 10),
       child: Column(
@@ -40,33 +40,6 @@ class WorkspaceHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                tooltip: 'Client settings',
-                onPressed:
-                    controller.busy ||
-                        controller.loadingRules ||
-                        controller.connecting ||
-                        controller.devices.isEmpty
-                    ? null
-                    : () => showDialog<void>(
-                        context: context,
-                        builder: (_) =>
-                            ConnectionDialog(controller: controller),
-                      ),
-                icon: const Icon(Icons.tune_rounded),
-              ),
-              IconButton(
-                tooltip: 'Refresh devices and topics',
-                onPressed: controller.busy || controller.connecting
-                    ? null
-                    : controller.loadWorkspace,
-                icon: const Icon(Icons.refresh),
-              ),
-              IconButton(
-                tooltip: 'Sign out',
-                onPressed: controller.busy ? null : controller.logout,
-                icon: const Icon(Icons.logout),
               ),
             ],
           ),

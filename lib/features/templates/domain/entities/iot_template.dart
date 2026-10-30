@@ -29,12 +29,13 @@ class TemplateControl {
 }
 
 class TemplateMetric {
-  const TemplateMetric(
-      {required this.id,
-      required this.label,
-      required this.unit,
-      required this.min,
-      required this.max});
+  const TemplateMetric({
+    required this.id,
+    required this.label,
+    required this.unit,
+    required this.min,
+    required this.max,
+  });
   final String id;
   final String label;
   final String unit;
@@ -43,15 +44,16 @@ class TemplateMetric {
 }
 
 class IotTemplate {
-  const IotTemplate(
-      {required this.id,
-      required this.name,
-      required this.description,
-      required this.category,
-      required this.icon,
-      required this.color,
-      required this.controls,
-      required this.metrics});
+  const IotTemplate({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.category,
+    required this.icon,
+    required this.color,
+    required this.controls,
+    required this.metrics,
+  });
   final String id;
   final String name;
   final String description;
@@ -71,12 +73,13 @@ class TelemetryPoint {
 enum EventDirection { sent, received }
 
 class TemplateEvent {
-  const TemplateEvent(
-      {required this.direction,
-      required this.templateName,
-      required this.topic,
-      required this.payload,
-      required this.time});
+  const TemplateEvent({
+    required this.direction,
+    required this.templateName,
+    required this.topic,
+    required this.payload,
+    required this.time,
+  });
   final EventDirection direction;
   final String templateName;
   final String topic;

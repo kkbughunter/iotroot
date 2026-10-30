@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show ThemeMode;
 
 import '../../../../core/api_client.dart';
 import '../../../workspace/data/broker_service.dart';
@@ -41,6 +42,7 @@ class TemplateController extends ChangeNotifier {
       connecting = false,
       sending = false;
   bool loadingHistory = false;
+  bool storedDeviceOnly = false;
   bool needsClientSetup = false;
   int _deviceSelection = 0, _connection = 0;
   final Map<String, Map<String, Object>> _topicControls = {};
@@ -48,7 +50,6 @@ class TemplateController extends ChangeNotifier {
   String connectionStatus = 'Disconnected';
   int pageIndex = 0;
   TemplateCategory? categoryFilter;
-  // Only the app device is loaded; the app never lists or creates other devices.
   List<Device> devices = [];
   List<TopicRule> rules = [];
   Map<int, Map<String, dynamic>> statuses = {};
@@ -59,6 +60,7 @@ class TemplateController extends ChangeNotifier {
   final Map<String, List<TelemetryPoint>> metricHistory = {};
   final List<TemplateEvent> events = [];
   final Map<int, List<BrokerMessage>> _readings = {};
+  final Map<int, bool> _topicPower = {};
   // Newest stored message per stored topic, shown on the home cards.
   final Map<int, Map<String, dynamic>> _latestStored = {};
   Map<String, dynamic> _preferences = {};
@@ -70,6 +72,8 @@ class TemplateController extends ChangeNotifier {
   Future<void> _preferenceWrite = Future.value();
 
   bool get authenticated => api.authenticated;
+  ThemeMode get themeMode =>
+      _preferences['darkMode'] == true ? ThemeMode.dark : ThemeMode.light;
   bool get connected =>
       connectionStatus == 'Connected' ||
       connectionStatus.startsWith('Subscription rejected:');
@@ -148,7 +152,7 @@ class TemplateController extends ChangeNotifier {
       _preferences = saved == null
           ? {}
           : Map<String, dynamic>.from(jsonDecode(saved) as Map);
-      devices = [?_appDeviceFrom(all)];
+      devices = all;
       try {
         final data =
             await api.request('/api/devices/connection-status') as List;
@@ -165,7 +169,17 @@ class TemplateController extends ChangeNotifier {
             'Devices loaded, but broker details are unavailable: ${e.message}';
       }
       if (generation != _workspace || _disposed) return;
-      final device = devices.firstOrNull;
+      final savedDeviceId = _preferences['selectedDevice'];
+      final accountEmail = api.email.trim().toLowerCase();
+      final device =
+          devices.where((device) => device.id == savedDeviceId).firstOrNull ??
+          devices
+              .where(
+                (device) =>
+                    device.username.trim().toLowerCase() == accountEmail,
+              )
+              .firstOrNull ??
+          devices.firstOrNull;
       if (device != null) {
         await selectDevice(device);
       } else {
@@ -184,18 +198,6 @@ class TemplateController extends ChangeNotifier {
     }
   }
 
-  // The app device is the client the account signs in with. The backend creates
-  // it at signup with username = account email, so prefer that match, then the
-  // device used last time, then the first device on the account.
-  Device? _appDeviceFrom(List<Device> all) {
-    final email = api.email.trim().toLowerCase();
-    return all
-            .where((d) => d.username.trim().toLowerCase() == email)
-            .firstOrNull ??
-        all.where((d) => d.id == _preferences['selectedDevice']).firstOrNull ??
-        all.firstOrNull;
-  }
-
   Future<void> selectDevice(Device device, {bool autoConnect = true}) async {
     disconnect();
     final selection = ++_deviceSelection;
@@ -210,6 +212,7 @@ class TemplateController extends ChangeNotifier {
     sending = false;
     rules = [];
     _readings.clear();
+    _topicPower.clear();
     _latestStored.clear();
     metricHistory.clear();
     storedMessages = [];
@@ -260,6 +263,7 @@ class TemplateController extends ChangeNotifier {
     _storedPages = 0;
     loadingHistory = false;
     historyError = null;
+    storedDeviceOnly = false;
     _notify();
     if (rule.isStored) unawaited(loadHistory());
   }
@@ -310,6 +314,12 @@ class TemplateController extends ChangeNotifier {
     _notify();
   }
 
+  void setDarkMode(bool enabled) {
+    _preferences['darkMode'] = enabled;
+    unawaited(_savePreferences());
+    _notify();
+  }
+
   void setCategory(TemplateCategory? value) {
     categoryFilter = value;
     _notify();
@@ -320,7 +330,6 @@ class TemplateController extends ChangeNotifier {
     _topicControls.remove(_ruleKey);
     _resetControls();
     _rebuildMetrics();
-    pageIndex = 1;
     unawaited(_saveRule({'template': template.id}));
     if (notify) _notify();
   }
@@ -359,6 +368,33 @@ class TemplateController extends ChangeNotifier {
           .firstOrNull ??
       templates.first;
   BrokerMessage? latestFor(TopicRule rule) => _readings[rule.id]?.lastOrNull;
+  bool powerFor(TopicRule rule) {
+    if (_topicPower.containsKey(rule.id)) return _topicPower[rule.id]!;
+    final live = latestFor(rule);
+    final stored = latestStoredFor(rule);
+    for (final payload in [
+      if (live != null) _decode(live.payload),
+      if (stored != null) stored['payload'],
+    ]) {
+      if (payload is Map && payload['power'] is bool) {
+        return payload['power'] as bool;
+      }
+    }
+    return _topicPower[rule.id] ?? false;
+  }
+
+  Future<bool> setTopicPower(TopicRule rule, bool value) async {
+    final sent = await sendTopicCommand(
+      rule,
+      rawPayload: jsonEncode({'power': value}),
+    );
+    if (sent) {
+      _topicPower[rule.id] = value;
+      _notify();
+    }
+    return sent;
+  }
+
   Map<String, Object> controlsFor(TopicRule rule) => _topicControls.putIfAbsent(
     '${selectedDevice?.id}:${rule.id}',
     () => {for (final c in templateFor(rule).controls) c.id: c.defaultValue},
@@ -385,8 +421,6 @@ class TemplateController extends ChangeNotifier {
       matchesTopic(rule.topic, destinationFor(rule));
   void openTopic(TopicRule rule) {
     selectRule(rule);
-    pageIndex = 1;
-    _notify();
   }
 
   void _restoreControls() {
@@ -539,17 +573,21 @@ class TemplateController extends ChangeNotifier {
         .where((r) => r.canSubscribe && matchesTopic(r.topic, message.topic))
         .toList();
     if (matching.isEmpty) return;
+    final payload = _decode(message.payload);
     for (final rule in matching) {
       final readings = _readings.putIfAbsent(rule.id, () => []);
       readings.add(message);
       if (readings.length > 200) readings.removeAt(0);
+      if (payload is Map && payload['power'] is bool) {
+        _topicPower[rule.id] = payload['power'] as bool;
+      }
     }
     _addEvent(
       TemplateEvent(
         direction: EventDirection.received,
         templateName: selectedDevice?.username ?? 'Device',
         topic: message.topic,
-        payload: _decode(message.payload),
+        payload: payload,
         time: message.time,
       ),
     );
@@ -621,6 +659,26 @@ class TemplateController extends ChangeNotifier {
       ? {'topicPrefix': rule.topic.split(RegExp(r'[+#]')).first}
       : {'topic': rule.topic};
 
+  static const _storedHistoryWindow = Duration(minutes: 30);
+
+  void setStoredDeviceOnly(bool value) {
+    if (storedDeviceOnly == value) return;
+    storedDeviceOnly = value;
+    storedMessages = [];
+    storedTotal = 0;
+    _storedPage = 0;
+    _storedPages = 0;
+    _notify();
+    unawaited(loadHistory());
+  }
+
+  Map<String, dynamic> _storedRow(Object? value) {
+    final row = Map<String, dynamic>.from(value as Map);
+    final payload = row['payload'];
+    if (payload is String) row['payload'] = _decode(payload);
+    return row;
+  }
+
   Future<void> refreshLatestStored() async {
     final device = selectedDevice;
     if (device == null) return;
@@ -646,17 +704,25 @@ class TemplateController extends ChangeNotifier {
           'deviceId': '${device.id}',
           ..._topicQuery(rule),
           'size': rule.wildcard ? '50' : '1',
+          'from': DateTime.now()
+              .toUtc()
+              .subtract(_storedHistoryWindow)
+              .toIso8601String(),
         },
       ) as Map;
       if (selection != _deviceSelection || generation != _workspace) return;
       final newest = (data['content'] as List)
-          .map((r) => Map<String, dynamic>.from(r as Map))
+          .map(_storedRow)
           .where((r) => matchesTopic(rule.topic, r['topic'] as String? ?? ''))
           .firstOrNull;
       if (newest == null) {
         _latestStored.remove(rule.id);
       } else {
         _latestStored[rule.id] = newest;
+        final payload = newest['payload'];
+        if (payload is Map && payload['power'] is bool) {
+          _topicPower[rule.id] = payload['power'] as bool;
+        }
       }
     } catch (_) {
       // Keep the last value on the card when a refresh fails.
@@ -687,13 +753,11 @@ class TemplateController extends ChangeNotifier {
       final data = await api.request(
         '/api/store/messages',
         query: {
-          'deviceId': '${selectedDevice!.id}',
+          if (storedDeviceOnly) 'deviceId': '${selectedDevice!.id}',
           ..._topicQuery(rule),
           'page': '$_storedPage',
           'size': '200',
-          'from': _historyTo!
-              .subtract(const Duration(hours: 1))
-              .toIso8601String(),
+          'from': _historyTo!.subtract(_storedHistoryWindow).toIso8601String(),
           'to': _historyTo!.toIso8601String(),
         },
       ) as Map;
@@ -701,12 +765,12 @@ class TemplateController extends ChangeNotifier {
         return;
       }
       final rows = (data['content'] as List)
-          .map((r) => Map<String, dynamic>.from(r as Map))
+          .map(_storedRow)
           .where((r) => matchesTopic(rule.topic, r['topic'] as String? ?? ''))
           .toList();
       storedMessages = more ? [...storedMessages, ...rows] : rows;
-      storedTotal = (data['totalElements'] as num).toInt();
-      _storedPages = (data['totalPages'] as num).toInt();
+      storedTotal = (data['totalElements'] as num?)?.toInt() ?? rows.length;
+      _storedPages = (data['totalPages'] as num?)?.toInt() ?? 1;
       _storedPage++;
     } catch (e) {
       if (selection == _selection && generation == _workspace) {
@@ -733,6 +797,7 @@ class TemplateController extends ChangeNotifier {
     selectedDevice = null;
     selectedRule = null;
     _readings.clear();
+    _topicPower.clear();
     _latestStored.clear();
     metricHistory.clear();
     events.clear();

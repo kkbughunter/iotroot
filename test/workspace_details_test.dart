@@ -72,7 +72,7 @@ void main() {
       expect(
         DateTime.parse(queries.single['to']!)
             .difference(DateTime.parse(queries.single['from']!)),
-        const Duration(hours: 1),
+        const Duration(minutes: 30),
       );
       expect(controller.storedMessages.length, 1);
       await tester.pumpWidget(
@@ -100,59 +100,62 @@ void main() {
     },
   );
 
-  test('home cards query only their topic and keep the newest matching row',
-      () async {
-    final queries = <Map<String, String>>[];
-    final api = ApiClient(
-      store: MemoryStore(),
-      client: MockClient((request) async {
-        if (request.url.path.endsWith('/login')) return reply(tokens);
-        queries.add(request.url.queryParameters);
-        return reply({
-          'content': [
-            {
-              'id': 3,
-              'topic': '/iot/store/1/a/other',
-              'receivedAt': '2026-10-29T10:02:00Z',
-              'payload': {'x': 1},
-            },
-            {
-              'id': 2,
-              'topic': '/iot/store/1/a/status',
-              'receivedAt': '2026-10-29T10:01:00Z',
-              'payload': {'state': 'on'},
-            },
-          ],
-          'totalElements': 2,
-          'totalPages': 1,
-        });
-      }),
-    );
-    await api.login('https://example.com', 'user@example.com', 'secret');
-    final controller = TemplateController(
-      TemplateRepository(),
-      api: api,
-      broker: FakeBroker(),
-    );
-    addTearDown(controller.dispose);
-    controller.selectedDevice = const Device(
-      id: 1,
-      clientId: 'client',
-      username: 'mqtt',
-    );
-    controller.rules = [
-      const TopicRule(
-        id: 2,
-        topic: '/iot/store/1/+/status',
-        permission: 'publish',
-        topicType: 'STORE',
-      ),
-    ];
-    await controller.refreshLatestStored();
-    expect(queries.single['topicPrefix'], '/iot/store/1/');
-    expect(queries.single.containsKey('topic'), isFalse);
-    expect(queries.single['size'], '50');
-    expect(controller.latestStoredFor(controller.rules.single)!['payload'],
-        {'state': 'on'});
-  });
+  test(
+    'home cards query only their topic and keep the newest matching row',
+    () async {
+      final queries = <Map<String, String>>[];
+      final api = ApiClient(
+        store: MemoryStore(),
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/login')) return reply(tokens);
+          queries.add(request.url.queryParameters);
+          return reply({
+            'content': [
+              {
+                'id': 3,
+                'topic': '/iot/store/1/a/other',
+                'receivedAt': '2026-10-29T10:02:00Z',
+                'payload': {'x': 1},
+              },
+              {
+                'id': 2,
+                'topic': '/iot/store/1/a/status',
+                'receivedAt': '2026-10-29T10:01:00Z',
+                'payload': {'state': 'on'},
+              },
+            ],
+            'totalElements': 2,
+            'totalPages': 1,
+          });
+        }),
+      );
+      await api.login('https://example.com', 'user@example.com', 'secret');
+      final controller = TemplateController(
+        TemplateRepository(),
+        api: api,
+        broker: FakeBroker(),
+      );
+      addTearDown(controller.dispose);
+      controller.selectedDevice = const Device(
+        id: 1,
+        clientId: 'client',
+        username: 'mqtt',
+      );
+      controller.rules = [
+        const TopicRule(
+          id: 2,
+          topic: '/iot/store/1/+/status',
+          permission: 'publish',
+          topicType: 'STORE',
+        ),
+      ];
+      await controller.refreshLatestStored();
+      expect(queries.single['topicPrefix'], '/iot/store/1/');
+      expect(queries.single.containsKey('topic'), isFalse);
+      expect(queries.single['size'], '50');
+      expect(controller.latestStoredFor(controller.rules.single)!['payload'], {
+        'state': 'on',
+      });
+    },
+  );
 }

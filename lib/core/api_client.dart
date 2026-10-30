@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import 'secure_store.dart';
 
 class ApiException implements Exception {
@@ -13,12 +15,14 @@ class ApiException implements Exception {
 
 class ApiClient {
   ApiClient({http.Client? client, SecretStore? store})
-      : _client = client ?? http.Client(),
-        store = store ?? const SecureStore();
+    : _client = client ?? http.Client(),
+      store = store ?? const SecureStore();
   final http.Client _client;
   final SecretStore store;
-  String baseUrl = const String.fromEnvironment('API_BASE_URL',
-      defaultValue: 'https://iotroot.astraval.com');
+  String baseUrl = const String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://iotroot.astraval.com',
+  );
   String? _accessToken;
   String? _refreshToken;
   DateTime _expiresAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -69,10 +73,12 @@ class ApiClient {
     final generation = ++_generation;
     baseUrl = url.trim().replaceFirst(RegExp(r'/+$'), '');
     this.email = email.trim();
-    final data = await request('/api/auth/login',
-        method: 'POST',
-        authenticated: false,
-        body: {'email': this.email, 'password': password});
+    final data = await request(
+      '/api/auth/login',
+      method: 'POST',
+      authenticated: false,
+      body: {'email': this.email, 'password': password},
+    );
     await _saveTokens(Map<String, dynamic>.from(data as Map), generation);
   }
 
@@ -82,11 +88,14 @@ class ApiClient {
     }
     if (data['accessToken'] is! String || data['refreshToken'] is! String) {
       throw const ApiException(
-          'The server returned an invalid login response.');
+        'The server returned an invalid login response.',
+      );
     }
     final expiry = DateTime.now().add(
-        Duration(seconds: (data['expiresInSeconds'] as num?)?.toInt() ?? 3600));
-    await _persist(() => store.write(
+      Duration(seconds: (data['expiresInSeconds'] as num?)?.toInt() ?? 3600),
+    );
+    await _persist(
+      () => store.write(
         'iotroot.session',
         jsonEncode({
           'baseUrl': baseUrl,
@@ -94,7 +103,9 @@ class ApiClient {
           'accessToken': data['accessToken'],
           'refreshToken': data['refreshToken'],
           'expiresAt': expiry.toIso8601String(),
-        })));
+        }),
+      ),
+    );
     if (generation != _generation) {
       throw const ApiException('Session changed.', 401);
     }
@@ -111,10 +122,12 @@ class ApiClient {
         if (_refreshToken == null) {
           throw const ApiException('Please sign in again.', 401);
         }
-        final data = await request('/api/auth/refresh-token',
-            method: 'POST',
-            authenticated: false,
-            body: {'refreshToken': _refreshToken});
+        final data = await request(
+          '/api/auth/refresh-token',
+          method: 'POST',
+          authenticated: false,
+          body: {'refreshToken': _refreshToken},
+        );
         if (generation != _generation) {
           throw const ApiException('Session changed.', 401);
         }
@@ -134,12 +147,14 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> request(String path,
-      {String method = 'GET',
-      Object? body,
-      Map<String, String>? query,
-      bool authenticated = true,
-      bool retry = true}) async {
+  Future<dynamic> request(
+    String path, {
+    String method = 'GET',
+    Object? body,
+    Map<String, String>? query,
+    bool authenticated = true,
+    bool retry = true,
+  }) async {
     if (authenticated) {
       if (_accessToken == null) {
         throw const ApiException('Please sign in again.', 401);
@@ -166,18 +181,25 @@ class ApiClient {
           .timeout(const Duration(seconds: 20));
     } on TimeoutException {
       throw const ApiException(
-          'The API timed out. Check your connection and try again.');
+        'The API timed out. Check your connection and try again.',
+      );
     } on http.ClientException {
       throw const ApiException(
-          'Cannot reach the API. Check the server URL and your connection.');
+        'Cannot reach the API. Check the server URL and your connection.',
+      );
     }
     if (authenticated && generation != _generation) {
       throw const ApiException('Session changed.', 401);
     }
     if (response.statusCode == 401 && authenticated && retry) {
       if (_accessToken == tokenUsed) await _refresh();
-      return request(path,
-          method: method, body: body, query: query, retry: false);
+      return request(
+        path,
+        method: method,
+        body: body,
+        query: query,
+        retry: false,
+      );
     }
     if (response.statusCode == 401 && authenticated) {
       await clearSession();
@@ -189,8 +211,9 @@ class ApiClient {
       decoded = jsonDecode(response.body);
     } on FormatException {
       throw ApiException(
-          'The API returned an invalid response (${response.statusCode}).',
-          response.statusCode);
+        'The API returned an invalid response (${response.statusCode}).',
+        response.statusCode,
+      );
     }
     if (decoded is! Map) {
       throw const ApiException('The API returned an unexpected response.');
@@ -198,8 +221,10 @@ class ApiClient {
     if (response.statusCode < 200 ||
         response.statusCode >= 300 ||
         decoded['status'] == false) {
-      throw ApiException(decoded['message']?.toString() ?? 'Request failed.',
-          response.statusCode);
+      throw ApiException(
+        decoded['message']?.toString() ?? 'Request failed.',
+        response.statusCode,
+      );
     }
     return decoded['data'];
   }
@@ -209,11 +234,15 @@ class ApiClient {
     await clearSession();
     if (refresh != null) {
       try {
-        await request('/api/auth/logout',
-            method: 'POST',
-            authenticated: false,
-            body: {'refreshToken': refresh});
-      } on ApiException {/* Local sign-out still succeeds while offline. */}
+        await request(
+          '/api/auth/logout',
+          method: 'POST',
+          authenticated: false,
+          body: {'refreshToken': refresh},
+        );
+      } on ApiException {
+        /* Local sign-out still succeeds while offline. */
+      }
     }
   }
 
