@@ -69,7 +69,9 @@ class _HomeShellState extends State<HomeShell> {
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 900;
             final pages = <Widget>[
-              TopicDashboardPage(controller: controller),
+              controller.connected && !controller.connecting
+                  ? TopicDashboardPage(controller: controller)
+                  : _HomeConnectionGate(controller: controller),
               ActivityPage(controller: controller),
               SettingsPage(controller: controller),
             ];
@@ -108,6 +110,47 @@ class _HomeShellState extends State<HomeShell> {
       },
     );
   }
+}
+
+class _HomeConnectionGate extends StatelessWidget {
+  const _HomeConnectionGate({required this.controller});
+
+  final TemplateController controller;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (controller.connecting) ...[
+            const CircularProgressIndicator(),
+            const SizedBox(height: 18),
+            Text(
+              controller.connected
+                  ? 'Loading retained topic state…'
+                  : 'Connecting to your device…',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ] else ...[
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 42,
+              color: AppTheme.muted,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Connect your device to load the home controls.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
 }
 
 class _SideNavigation extends StatelessWidget {

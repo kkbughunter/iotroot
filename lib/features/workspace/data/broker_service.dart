@@ -81,6 +81,15 @@ class MqttBrokerConnection extends BrokerConnection {
       if (client.connectionStatus?.state != MqttConnectionState.connected) {
         throw StateError('Broker rejected connection');
       }
+      final retainedSettled = Completer<void>();
+      Timer? retainedQuietTimer;
+      void waitForQuietPeriod() {
+        retainedQuietTimer?.cancel();
+        retainedQuietTimer = Timer(const Duration(milliseconds: 500), () {
+          if (!retainedSettled.isCompleted) retainedSettled.complete();
+        });
+      }
+
       _messages = client.updates?.listen((batch) {
         if (!current()) return;
         for (final item in batch) {
@@ -93,6 +102,7 @@ class MqttBrokerConnection extends BrokerConnection {
             ),
           );
         }
+        waitForQuietPeriod();
       });
       _published = client.published?.listen((message) {
         _pending.remove(message.variableHeader?.messageIdentifier)?.complete();
@@ -102,6 +112,16 @@ class MqttBrokerConnection extends BrokerConnection {
           in rules.where((r) => r.canSubscribe).map((r) => r.topic).toSet()) {
         client.subscribe(topic, MqttQos.atLeastOnce);
       }
+      // MQTT has no retained-message completion packet. Keep the dashboard
+      // gated until deliveries have been quiet for 500 ms, but never block a
+      // connection for more than three seconds when no retained value exists.
+      waitForQuietPeriod();
+      final retainedTimeout = Timer(const Duration(seconds: 3), () {
+        if (!retainedSettled.isCompleted) retainedSettled.complete();
+      });
+      await retainedSettled.future;
+      retainedQuietTimer?.cancel();
+      retainedTimeout.cancel();
     } catch (_) {
       if (current()) {
         disconnect();
