@@ -64,13 +64,13 @@ class _TopicDashboardPageState extends State<TopicDashboardPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  controller.selectedDevice?.name ?? 'My app device',
+                  'Welcome back,',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
-                Text(
-                  controller.connected ? 'Connected' : 'Not connected',
-                  style: const TextStyle(fontSize: 12, color: AppTheme.muted),
-                ),
+                // Text(
+                //   controller.connected ? 'Connected' : 'Not connected',
+                //   style: const TextStyle(fontSize: 12, color: AppTheme.muted),
+                // ),
                 const SizedBox(height: 12),
                 if (controller.rules.isEmpty &&
                     !controller.loadingRules &&
@@ -82,7 +82,13 @@ class _TopicDashboardPageState extends State<TopicDashboardPage> {
                   children: [
                     for (final rule in controller.rules)
                       SizedBox(
-                        width: cardWidth,
+                        width:
+                            controller.controlTypeFor(rule) ==
+                                    TopicControlType.fan &&
+                                columns > 1
+                            ? cardWidth * 2 + gap
+                            : cardWidth,
+                        height: 140,
                         child: _TopicCard(controller: controller, rule: rule),
                       ),
                   ],
@@ -115,9 +121,19 @@ class _TopicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final latest = _latest;
     final power = controller.powerFor(rule);
+    final type = controller.controlTypeFor(rule);
+    final isFan = type == TopicControlType.fan;
+    final range = controller.fanRangeFor(rule);
+    final accent = rule.isStored
+        ? const Color(0xFFDDF3E5)
+        : const Color(0xFFFFE8CC);
+    final accentStrong = rule.isStored
+        ? const Color(0xFF287A4B)
+        : const Color(0xFFAD5B00);
     return Card(
       key: ValueKey('topic-card:${rule.id}'),
       margin: EdgeInsets.zero,
+      color: accent,
       child: InkWell(
         onTap: () {
           controller.openTopic(rule);
@@ -139,18 +155,17 @@ class _TopicCard extends StatelessWidget {
                     height: 30,
                     margin: const EdgeInsets.only(right: 7),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
+                      color: Colors.white.withValues(alpha: .72),
                       borderRadius: BorderRadius.circular(9),
                     ),
                     child: Icon(
-                      rule.isStored
-                          ? Icons.storage_rounded
-                          : Icons.sensors_rounded,
+                      isFan
+                          ? Icons.mode_fan_off_rounded
+                          : Icons.lightbulb_outline_rounded,
                       size: 17,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: accentStrong,
                     ),
                   ),
-                  // Device name 
                   Expanded(
                     child: Text(
                       rule.name,
@@ -159,41 +174,120 @@ class _TopicCard extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  Transform.scale(
-                    scale: .78,
-                    child: Switch.adaptive(
-                      key: ValueKey('topic-power:${rule.id}'),
-                      value: power,
-                      onChanged: controller.canSendTopic(rule)
-                          ? (value) => controller.setTopicPower(rule, value)
-                          : null,
-                    ),
-                  ),
                 ],
               ),
-              // topic 
+
               Text(
                 rule.topic,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 11, color: AppTheme.muted),
               ),
-              const SizedBox(height: 6),
-              // Data
-              Text(
-                latest ?? 'No data',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: latest == null ? AppTheme.muted : AppTheme.ink,
+
+              const Spacer(),
+              if (isFan)
+                Row(
+                  children: [
+                    Expanded(
+                      child: Slider(
+                        key: ValueKey('topic-range:${rule.id}'),
+                        value: range.toDouble(),
+                        min: 0,
+                        max: 10,
+                        divisions: 10,
+                        label: '$range',
+                        onChanged: controller.canSendTopic(rule)
+                            ? (value) =>
+                                  controller.setFanRange(rule, value.round())
+                            : null,
+                        onChangeEnd: controller.canSendTopic(rule)
+                            ? (value) => controller.sendFanCommand(
+                                rule,
+                                power,
+                                value.round(),
+                              )
+                            : null,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 28,
+                      child: Text(
+                        '$range',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    _PowerSwitch(
+                      controller: controller,
+                      rule: rule,
+                      value: power,
+                      range: range,
+                      fan: true,
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        latest ?? 'No data',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: latest == null ? AppTheme.muted : AppTheme.ink,
+                        ),
+                      ),
+                    ),
+                    _PowerSwitch(
+                      controller: controller,
+                      rule: rule,
+                      value: power,
+                      range: range,
+                      fan: false,
+                    ),
+                  ],
                 ),
-              ),
-              
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class _PowerSwitch extends StatelessWidget {
+  const _PowerSwitch({
+    required this.controller,
+    required this.rule,
+    required this.value,
+    required this.range,
+    required this.fan,
+  });
+
+  final TemplateController controller;
+  final TopicRule rule;
+  final bool value;
+  final int range;
+  final bool fan;
+
+  @override
+  Widget build(BuildContext context) => Transform.scale(
+    scale: .78,
+    child: Switch.adaptive(
+      key: ValueKey('topic-power:${rule.id}'),
+      value: value,
+      onChanged: controller.canSendTopic(rule)
+          ? (enabled) {
+              if (fan) {
+                controller.sendFanCommand(rule, enabled, range);
+              } else {
+                controller.setTopicPower(rule, enabled);
+              }
+            }
+          : null,
+    ),
+  );
 }

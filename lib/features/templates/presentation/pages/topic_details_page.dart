@@ -92,6 +92,8 @@ class _TopicDetailsBody extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                _TopicControlCard(controller: controller, rule: rule),
                 if (rule.isStored) ...[
                   const SizedBox(height: 12),
                   Card(
@@ -104,6 +106,120 @@ class _TopicDetailsBody extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicControlCard extends StatelessWidget {
+  const _TopicControlCard({required this.controller, required this.rule});
+
+  final TemplateController controller;
+  final TopicRule rule;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = controller.controlTypeFor(rule);
+    final enabled = controller.powerFor(rule);
+    final range = controller.fanRangeFor(rule);
+    final canSend = controller.canSendTopic(rule);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Topic control setup',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose how this topic is controlled. This setting is saved for this topic.',
+              style: TextStyle(color: AppTheme.muted),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<TopicControlType>(
+              key: ValueKey('control-type:${rule.id}:${type.name}'),
+              initialValue: type,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Control type',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: TopicControlType.switchControl,
+                  child: Text('Switch (on/off)'),
+                ),
+                DropdownMenuItem(
+                  value: TopicControlType.fan,
+                  child: Text('Fan (on/off + speed)'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) controller.setTopicControlType(rule, value);
+              },
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                type == TopicControlType.fan ? 'Fan status' : 'Status',
+              ),
+              subtitle: Text(enabled ? 'On' : 'Off'),
+              value: enabled,
+              onChanged: canSend
+                  ? (value) {
+                      if (type == TopicControlType.fan) {
+                        controller.sendFanCommand(rule, value, range);
+                      } else {
+                        controller.setTopicPower(rule, value);
+                      }
+                    }
+                  : null,
+            ),
+            if (type == TopicControlType.fan) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Expanded(child: Text('Speed')),
+                  Text(
+                    '$range',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              Slider(
+                value: range.toDouble(),
+                min: 0,
+                max: 10,
+                divisions: 10,
+                label: '$range',
+                onChanged: canSend
+                    ? (value) => controller.setFanRange(rule, value.round())
+                    : null,
+              ),
+              FilledButton.icon(
+                onPressed: canSend
+                    ? () => controller.sendFanCommand(rule, enabled, range)
+                    : null,
+                icon: const Icon(Icons.send_rounded),
+                label: Text(
+                  controller.sending ? 'Sending…' : 'Send fan command',
+                ),
+              ),
+            ],
+            if (!canSend) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Connect to the broker with publish permission to use this control.',
+                style: TextStyle(fontSize: 12, color: AppTheme.muted),
+              ),
+            ],
+          ],
         ),
       ),
     );

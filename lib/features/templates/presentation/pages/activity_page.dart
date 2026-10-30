@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../domain/entities/iot_template.dart';
 import '../controllers/template_controller.dart';
-import '../widgets/page_header.dart';
 
 class ActivityPage extends StatelessWidget {
   const ActivityPage({super.key, required this.controller});

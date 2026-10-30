@@ -193,6 +193,36 @@ void main() {
     expect(await controller.sendTopicCommand(controller.rules[1]), isFalse);
   });
 
+  test(
+    'topic control type is saved and fan publishes status and range',
+    () async {
+      final rule = controller.rules.first;
+      await controller.setTopicControlType(rule, TopicControlType.fan);
+      controller.setFanRange(rule, 7);
+      await controller.connect('secret', controller.brokerSettings);
+
+      expect(controller.controlTypeFor(rule), TopicControlType.fan);
+      expect(controller.fanRangeFor(rule), 7);
+      expect(await controller.sendFanCommand(rule, true, 7), isTrue);
+      expect(jsonDecode(broker.published['room/climate']!), {
+        'status': 'on',
+        'range': 7,
+      });
+      expect(broker.retained['room/climate'], isTrue);
+    },
+  );
+
+  test('MQTT state initializes standard topic controls', () async {
+    final rule = controller.rules.first;
+    await controller.setTopicControlType(rule, TopicControlType.fan);
+    await controller.connect('secret', controller.brokerSettings);
+
+    broker.receive('room/climate', '{"status":"on","range":8}');
+
+    expect(controller.powerFor(rule), isTrue);
+    expect(controller.fanRangeFor(rule), 8);
+  });
+
   test('MQTT filters follow level boundaries, wildcards and system topics', () {
     expect(matchesTopic('room/#', 'room'), isTrue);
     expect(matchesTopic('room/+', 'room/temp'), isTrue);

@@ -83,22 +83,22 @@ class SettingsPage extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 16),
-        _SettingsCard(
-          title: 'Appearance',
-          icon: Icons.palette_outlined,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Dark theme'),
-              subtitle: const Text(
-                'Use a darker color scheme throughout the app.',
-              ),
-              value: controller.themeMode == ThemeMode.dark,
-              onChanged: controller.setDarkMode,
-            ),
-          ],
-        ),
+        // const SizedBox(height: 16),
+        // _SettingsCard(
+        //   title: 'Appearance',
+        //   icon: Icons.palette_outlined,
+        //   children: [
+        //     SwitchListTile(
+        //       contentPadding: EdgeInsets.zero,
+        //       title: const Text('Dark theme'),
+        //       subtitle: const Text(
+        //         'Use a darker color scheme throughout the app.',
+        //       ),
+        //       value: controller.themeMode == ThemeMode.dark,
+        //       onChanged: controller.setDarkMode,
+        //     ),
+        //   ],
+        // ),
         const SizedBox(height: 16),
         _SettingsCard(
           title: 'Account',

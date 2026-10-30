@@ -100,6 +100,7 @@ class FakeBroker extends BrokerConnection {
   BrokerSettings? settings;
   int disconnects = 0;
   final published = <String, String>{};
+  final retained = <String, bool>{};
   @override
   Future<void> connect(
     Device device,
@@ -116,9 +117,14 @@ class FakeBroker extends BrokerConnection {
   }
 
   @override
-  Future<void> publish(String topic, String payload) async {
+  Future<void> publish(
+    String topic,
+    String payload, {
+    bool retain = true,
+  }) async {
     if (failPublish) throw StateError('Broker unavailable');
     published[topic] = payload;
+    retained[topic] = retain;
   }
 
   @override

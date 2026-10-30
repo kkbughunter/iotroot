@@ -61,7 +61,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('topic-power:11')));
         await tester.pumpAndSettle();
-        expect(broker.published['room/climate'], '{"power":true}');
+        expect(broker.published['room/climate'], '{"status":"on"}');
         broker.receive('room/climate', '{"power_draw":8.4,"extra":"real"}');
         await tester.pumpAndSettle();
         expect(find.byKey(const ValueKey('topic-card:11')), findsOneWidget);

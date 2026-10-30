@@ -15,7 +15,7 @@ abstract class BrokerConnection {
     BrokerSettings settings,
     List<TopicRule> rules,
   );
-  Future<void> publish(String topic, String payload);
+  Future<void> publish(String topic, String payload, {bool retain = true});
   void disconnect();
 }
 
@@ -114,7 +114,11 @@ class MqttBrokerConnection extends BrokerConnection {
   }
 
   @override
-  Future<void> publish(String topic, String payload) async {
+  Future<void> publish(
+    String topic,
+    String payload, {
+    bool retain = true,
+  }) async {
     final client = _client;
     if (client == null ||
         client.connectionStatus?.state != MqttConnectionState.connected) {
@@ -125,7 +129,7 @@ class MqttBrokerConnection extends BrokerConnection {
       topic,
       MqttQos.atLeastOnce,
       builder.payload!,
-      retain: false,
+      retain: retain,
     );
     final completer = Completer<void>();
     _pending[id] = completer;

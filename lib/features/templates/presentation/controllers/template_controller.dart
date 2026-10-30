@@ -10,6 +10,8 @@ import '../../../workspace/data/workspace_models.dart';
 import '../../data/template_repository.dart';
 import '../../domain/entities/iot_template.dart';
 
+enum TopicControlType { switchControl, fan }
+
 class TemplateController extends ChangeNotifier {
   TemplateController(
     TemplateRepository repository, {
@@ -61,6 +63,7 @@ class TemplateController extends ChangeNotifier {
   final List<TemplateEvent> events = [];
   final Map<int, List<BrokerMessage>> _readings = {};
   final Map<int, bool> _topicPower = {};
+  final Map<int, int> _topicRanges = {};
   // Newest stored message per stored topic, shown on the home cards.
   final Map<int, Map<String, dynamic>> _latestStored = {};
   Map<String, dynamic> _preferences = {};
@@ -213,6 +216,7 @@ class TemplateController extends ChangeNotifier {
     rules = [];
     _readings.clear();
     _topicPower.clear();
+    _topicRanges.clear();
     _latestStored.clear();
     metricHistory.clear();
     storedMessages = [];
@@ -379,6 +383,11 @@ class TemplateController extends ChangeNotifier {
       if (payload is Map && payload['power'] is bool) {
         return payload['power'] as bool;
       }
+      if (payload is Map && payload['status'] != null) {
+        final status = payload['status'].toString().toLowerCase();
+        if (status == 'on' || status == 'true') return true;
+        if (status == 'off' || status == 'false') return false;
+      }
     }
     return _topicPower[rule.id] ?? false;
   }
@@ -386,11 +395,52 @@ class TemplateController extends ChangeNotifier {
   Future<bool> setTopicPower(TopicRule rule, bool value) async {
     final sent = await sendTopicCommand(
       rule,
-      rawPayload: jsonEncode({'power': value}),
+      rawPayload: jsonEncode({'status': value ? 'on' : 'off'}),
     );
     if (sent) {
       _topicPower[rule.id] = value;
       _notify();
+    }
+    return sent;
+  }
+
+  TopicControlType controlTypeFor(TopicRule rule) =>
+      preferencesFor(rule)['controlType'] == 'fan'
+      ? TopicControlType.fan
+      : TopicControlType.switchControl;
+
+  int fanRangeFor(TopicRule rule) {
+    return _topicRanges[rule.id] ?? 5;
+  }
+
+  Future<void> setTopicControlType(
+    TopicRule rule,
+    TopicControlType type,
+  ) async {
+    if (selectedRule?.id != rule.id) selectRule(rule);
+    await _saveRule({
+      'controlType': type == TopicControlType.fan ? 'fan' : 'switch',
+    });
+    _notify();
+  }
+
+  void setFanRange(TopicRule rule, int value) {
+    final range = value.clamp(0, 10);
+    _topicRanges[rule.id] = range;
+    _notify();
+  }
+
+  Future<bool> sendFanCommand(TopicRule rule, bool enabled, int range) async {
+    final sent = await sendTopicCommand(
+      rule,
+      rawPayload: jsonEncode({
+        'status': enabled ? 'on' : 'off',
+        'range': range.clamp(0, 10),
+      }),
+    );
+    if (sent) {
+      _topicPower[rule.id] = enabled;
+      setFanRange(rule, range);
     }
     return sent;
   }
@@ -539,7 +589,7 @@ class TemplateController extends ChangeNotifier {
     error = null;
     _notify();
     try {
-      await broker.publish(destination, payload);
+      await broker.publish(destination, payload, retain: true);
       if (generation != _workspace ||
           deviceSelection != _deviceSelection ||
           _disposed) {
@@ -580,6 +630,15 @@ class TemplateController extends ChangeNotifier {
       if (readings.length > 200) readings.removeAt(0);
       if (payload is Map && payload['power'] is bool) {
         _topicPower[rule.id] = payload['power'] as bool;
+      }
+      if (payload is Map && payload['status'] != null) {
+        _topicPower[rule.id] = [
+          'on',
+          'true',
+        ].contains(payload['status'].toString().toLowerCase());
+      }
+      if (payload is Map && payload['range'] is num) {
+        _topicRanges[rule.id] = (payload['range'] as num).round().clamp(0, 10);
       }
     }
     _addEvent(
@@ -723,6 +782,18 @@ class TemplateController extends ChangeNotifier {
         if (payload is Map && payload['power'] is bool) {
           _topicPower[rule.id] = payload['power'] as bool;
         }
+        if (payload is Map && payload['status'] != null) {
+          _topicPower[rule.id] = [
+            'on',
+            'true',
+          ].contains(payload['status'].toString().toLowerCase());
+        }
+        if (payload is Map && payload['range'] is num) {
+          _topicRanges[rule.id] = (payload['range'] as num).round().clamp(
+            0,
+            10,
+          );
+        }
       }
     } catch (_) {
       // Keep the last value on the card when a refresh fails.
@@ -798,6 +869,7 @@ class TemplateController extends ChangeNotifier {
     selectedRule = null;
     _readings.clear();
     _topicPower.clear();
+    _topicRanges.clear();
     _latestStored.clear();
     metricHistory.clear();
     events.clear();
