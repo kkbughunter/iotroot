@@ -5,6 +5,7 @@ import '../features/templates/presentation/controllers/template_controller.dart'
 import '../features/templates/presentation/pages/home_shell.dart';
 import 'theme/app_theme.dart';
 import '../features/auth/presentation/login_page.dart';
+import '../features/home_widget/home_widget_bridge.dart';
 
 class IotRootApp extends StatefulWidget {
   const IotRootApp({super.key, this.controller});
@@ -22,6 +23,7 @@ class _IotRootAppState extends State<IotRootApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller = widget.controller ?? TemplateController(TemplateRepository());
+    HomeWidgetBridge.listenForToggles(_controller.handleHomeWidgetToggle);
     _controller.initialize();
   }
 
@@ -37,6 +39,7 @@ class _IotRootAppState extends State<IotRootApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    HomeWidgetBridge.listenForToggles(null);
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();

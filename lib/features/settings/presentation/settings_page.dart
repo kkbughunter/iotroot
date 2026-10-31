@@ -122,6 +122,47 @@ class SettingsPage extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 16),
+        _SettingsCard(
+          title: 'Home screen widget',
+          icon: Icons.widgets_outlined,
+          children: [
+            Text(
+              'Create one card with a name and power buttons for multiple topics.',
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed:
+                    controller.connected &&
+                        controller.homeWidgetRules.isNotEmpty &&
+                        !controller.addingHomeWidget
+                    ? controller.addHomeWidget
+                    : null,
+                icon: controller.addingHomeWidget
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add_to_home_screen_rounded),
+                label: Text(
+                  controller.addingHomeWidget
+                      ? 'Opening widget picker…'
+                      : 'Add widget',
+                ),
+              ),
+            ),
+            if (!controller.connected) ...[
+              const SizedBox(height: 10),
+              Text(
+                'Connect this client and remember its MQTT password first.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
       ],
     );
   }
@@ -148,7 +189,14 @@ class _SettingsCard extends StatelessWidget {
             children: [
               Icon(icon, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 10),
-              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),

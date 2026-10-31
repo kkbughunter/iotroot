@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 
 import '../../../../core/api_client.dart';
+import '../../../home_widget/home_widget_bridge.dart';
 import '../../../workspace/data/broker_service.dart';
 import '../../../workspace/data/workspace_models.dart';
 import '../../data/template_repository.dart';
@@ -45,6 +46,7 @@ class TemplateController extends ChangeNotifier {
       loadingHistory = false;
   bool storedDeviceOnly = false;
   bool needsClientSetup = false;
+  bool addingHomeWidget = false;
   int _deviceSelection = 0, _connection = 0;
   final Map<String, Map<String, Object>> _topicControls = {};
   String? error, historyError;
@@ -127,6 +129,7 @@ class TemplateController extends ChangeNotifier {
 
   Future<void> logout() async {
     _resetWorkspace();
+    unawaited(HomeWidgetBridge.clearConnection());
     error = null;
     busy = true;
     _notify();
@@ -517,6 +520,70 @@ class TemplateController extends ChangeNotifier {
       '';
   Future<String?> savedPassword() => api.store.read(_passwordKey);
 
+  List<TopicRule> get homeWidgetRules => rules
+      .where(
+        (rule) =>
+            rule.canPublish &&
+            destinationFor(rule).isNotEmpty &&
+            matchesTopic(rule.topic, destinationFor(rule)),
+      )
+      .toList(growable: false);
+
+  Future<bool?> handleHomeWidgetToggle(String topic, bool enabled) async {
+    if (!connected) return null;
+    final rule = homeWidgetRules
+        .where((candidate) => destinationFor(candidate) == topic)
+        .firstOrNull;
+    if (rule == null) return false;
+    return setTopicPower(rule, enabled);
+  }
+
+  Future<bool> addHomeWidget() async {
+    final device = selectedDevice;
+    final password = await savedPassword();
+    final widgetRules = homeWidgetRules;
+    if (device == null || password == null || !connected) {
+      error = 'Connect with remembered credentials before adding a widget.';
+      _notify();
+      return false;
+    }
+    if (widgetRules.isEmpty) {
+      error = 'This client has no publishable topics for a home widget.';
+      _notify();
+      return false;
+    }
+    addingHomeWidget = true;
+    error = null;
+    _notify();
+    try {
+      final requested = await HomeWidgetBridge.add(
+        device: device,
+        username: clientUsername,
+        password: password,
+        broker: brokerSettings,
+        topics: _homeWidgetTopics(widgetRules),
+      );
+      if (!requested) {
+        error =
+            'Your launcher does not support adding widgets from the app. '
+            'Add IoTRoot from the home-screen widget picker instead.';
+      }
+      return requested;
+    } finally {
+      addingHomeWidget = false;
+      _notify();
+    }
+  }
+
+  List<HomeWidgetTopic> _homeWidgetTopics(List<TopicRule> widgetRules) => [
+    for (final rule in widgetRules)
+      HomeWidgetTopic(
+        name: rule.name,
+        topic: destinationFor(rule),
+        enabled: powerFor(rule),
+      ),
+  ];
+
   Future<bool> connect(
     String password,
     BrokerSettings settings, {
@@ -559,6 +626,17 @@ class TemplateController extends ChangeNotifier {
       _preferences['selectedDevice'] = device.id;
       needsClientSetup = false;
       await _savePreferences();
+      if (remember) {
+        unawaited(
+          HomeWidgetBridge.sync(
+            device: device,
+            username: mqttUsername,
+            password: password,
+            broker: settings,
+            topics: _homeWidgetTopics(homeWidgetRules),
+          ),
+        );
+      }
       return true;
     } catch (e) {
       if (connection == _connection && generation == _workspace) {

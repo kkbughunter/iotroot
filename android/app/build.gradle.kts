@@ -47,3 +47,7 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
+}
