@@ -69,12 +69,6 @@ class _StoredTopicDataState extends State<StoredTopicData>
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          'Last 30 minutes · topic view includes messages from every device.',
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: 10),
         SegmentedButton<bool>(
           segments: const [
             ButtonSegment(

@@ -5,6 +5,7 @@ import '../../../workspace/data/workspace_models.dart';
 import '../controllers/template_controller.dart';
 import '../widgets/stored_topic_data.dart';
 import '../widgets/thermometer_readings.dart';
+import 'control_type_selection_page.dart';
 
 class TopicDetailsPage extends StatelessWidget {
   const TopicDetailsPage({super.key, required this.controller});
@@ -135,40 +136,22 @@ class _TopicControlCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Topic control setup',
+              'Choose Your Controle',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 4),
-            const Text(
-              'Choose how this topic is controlled. This setting is saved for this topic.',
-              style: TextStyle(color: AppTheme.muted),
-            ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<TopicControlType>(
-              key: ValueKey('control-type:${rule.id}:${type.name}'),
-              initialValue: type,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Control type',
-                border: OutlineInputBorder(),
+            OutlinedButton.icon(
+              key: const Key('choose-topic-control'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ControlTypeSelectionPage(
+                    controller: controller,
+                    rule: rule,
+                  ),
+                ),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: TopicControlType.switchControl,
-                  child: Text('Switch (on/off)'),
-                ),
-                DropdownMenuItem(
-                  value: TopicControlType.fan,
-                  child: Text('Fan (on/off + speed)'),
-                ),
-                DropdownMenuItem(
-                  value: TopicControlType.thermometer,
-                  child: Text('Thermometer (display only)'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value != null) controller.setTopicControlType(rule, value);
-              },
+              icon: const Icon(Icons.dashboard_customize_outlined),
+              label: const Text('Choose control layout'),
             ),
             const SizedBox(height: 12),
             if (isThermometer)
