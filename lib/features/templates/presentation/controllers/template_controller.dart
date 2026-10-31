@@ -80,6 +80,7 @@ class TemplateController extends ChangeNotifier {
   bool get connected =>
       connectionStatus == 'Connected' ||
       connectionStatus.startsWith('Subscription rejected:');
+  bool get reconnecting => connectionStatus == 'Reconnecting';
   bool get canSend =>
       connected &&
       !sending &&

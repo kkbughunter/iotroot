@@ -65,6 +65,22 @@ class _HomeShellState extends State<HomeShell> {
       animation: controller,
       builder: (context, _) {
         _promptSetup();
+        if (controller.reconnecting) {
+          return const Scaffold(
+            body: SafeArea(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 18),
+                    Text('Reconnecting to your device…'),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         return LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 900;
