@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../workspace/data/workspace_models.dart';
 import '../controllers/template_controller.dart';
+import '../widgets/thermometer_readings.dart';
 import 'topic_details_page.dart';
 
 class TopicDashboardPage extends StatefulWidget {
@@ -123,11 +124,16 @@ class _TopicCard extends StatelessWidget {
     final power = controller.powerFor(rule);
     final type = controller.controlTypeFor(rule);
     final isFan = type == TopicControlType.fan;
+    final isThermometer = type == TopicControlType.thermometer;
     final range = controller.fanRangeFor(rule);
-    final accent = rule.isStored
+    final accent = isThermometer
+        ? const Color(0xFFDDF2F0)
+        : rule.isStored
         ? const Color(0xFFDDF3E5)
         : const Color(0xFFFFE8CC);
-    final accentStrong = rule.isStored
+    final accentStrong = isThermometer
+        ? const Color(0xFF287A6B)
+        : rule.isStored
         ? const Color(0xFF287A4B)
         : const Color(0xFFAD5B00);
     return Card(
@@ -159,7 +165,9 @@ class _TopicCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(9),
                     ),
                     child: Icon(
-                      isFan
+                      isThermometer
+                          ? Icons.thermostat_rounded
+                          : isFan
                           ? Icons.mode_fan_off_rounded
                           : Icons.lightbulb_outline_rounded,
                       size: 17,
@@ -177,15 +185,30 @@ class _TopicCard extends StatelessWidget {
                 ],
               ),
 
-              Text(
-                rule.topic,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: AppTheme.muted),
-              ),
-
-              const Spacer(),
-              if (isFan)
+              if (!isThermometer && !isFan)
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      latest ?? 'No data',
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: latest == null ? AppTheme.muted : AppTheme.ink,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                const Spacer(),
+              if (isThermometer)
+                ThermometerReadings(
+                  controller: controller,
+                  rule: rule,
+                  compact: true,
+                )
+              else if (isFan)
                 Row(
                   children: [
                     Expanded(
@@ -228,27 +251,15 @@ class _TopicCard extends StatelessWidget {
                   ],
                 )
               else
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        latest ?? 'No data',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: latest == null ? AppTheme.muted : AppTheme.ink,
-                        ),
-                      ),
-                    ),
-                    _PowerSwitch(
-                      controller: controller,
-                      rule: rule,
-                      value: power,
-                      range: range,
-                      fan: false,
-                    ),
-                  ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _PowerSwitch(
+                    controller: controller,
+                    rule: rule,
+                    value: power,
+                    range: range,
+                    fan: false,
+                  ),
                 ),
             ],
           ),

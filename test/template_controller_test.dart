@@ -253,6 +253,26 @@ void main() {
     expect(controller.fanRangeFor(rule), 8);
   });
 
+  test(
+    'thermometer displays present values and defaults missing values to zero',
+    () async {
+      final rule = controller.rules.first;
+      await controller.setTopicControlType(rule, TopicControlType.thermometer);
+      await controller.connect('secret', controller.brokerSettings);
+
+      broker.receive('room/climate', '{"temperature":33.4}');
+
+      expect(controller.controlTypeFor(rule), TopicControlType.thermometer);
+      expect(controller.thermometerValueFor(rule, 'temperature'), 33.4);
+      expect(controller.thermometerValueFor(rule, 'humidity'), 0);
+
+      broker.receive('room/climate', '{"humidity":20}');
+
+      expect(controller.thermometerValueFor(rule, 'temperature'), 0);
+      expect(controller.thermometerValueFor(rule, 'humidity'), 20);
+    },
+  );
+
   test('MQTT filters follow level boundaries, wildcards and system topics', () {
     expect(matchesTopic('room/#', 'room'), isTrue);
     expect(matchesTopic('room/+', 'room/temp'), isTrue);

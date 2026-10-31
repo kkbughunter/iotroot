@@ -4,6 +4,7 @@ import '../../../../app/theme/app_theme.dart';
 import '../../../workspace/data/workspace_models.dart';
 import '../controllers/template_controller.dart';
 import '../widgets/stored_topic_data.dart';
+import '../widgets/thermometer_readings.dart';
 
 class TopicDetailsPage extends StatelessWidget {
   const TopicDetailsPage({super.key, required this.controller});
@@ -125,6 +126,7 @@ class _TopicControlCard extends StatelessWidget {
     final range = controller.fanRangeFor(rule);
     final canSend = controller.canSendTopic(rule);
     final sending = controller.isSendingTopic(rule);
+    final isThermometer = type == TopicControlType.thermometer;
 
     return Card(
       child: Padding(
@@ -159,29 +161,36 @@ class _TopicControlCard extends StatelessWidget {
                   value: TopicControlType.fan,
                   child: Text('Fan (on/off + speed)'),
                 ),
+                DropdownMenuItem(
+                  value: TopicControlType.thermometer,
+                  child: Text('Thermometer (display only)'),
+                ),
               ],
               onChanged: (value) {
                 if (value != null) controller.setTopicControlType(rule, value);
               },
             ),
             const SizedBox(height: 12),
-            SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                type == TopicControlType.fan ? 'Fan status' : 'Status',
-              ),
-              subtitle: Text(enabled ? 'On' : 'Off'),
-              value: enabled,
-              onChanged: canSend
-                  ? (value) {
-                      if (type == TopicControlType.fan) {
-                        controller.sendFanCommand(rule, value, range);
-                      } else {
-                        controller.setTopicPower(rule, value);
+            if (isThermometer)
+              ThermometerReadings(controller: controller, rule: rule)
+            else
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  type == TopicControlType.fan ? 'Fan status' : 'Status',
+                ),
+                subtitle: Text(enabled ? 'On' : 'Off'),
+                value: enabled,
+                onChanged: canSend
+                    ? (value) {
+                        if (type == TopicControlType.fan) {
+                          controller.sendFanCommand(rule, value, range);
+                        } else {
+                          controller.setTopicPower(rule, value);
+                        }
                       }
-                    }
-                  : null,
-            ),
+                    : null,
+              ),
             if (type == TopicControlType.fan) ...[
               const SizedBox(height: 4),
               Row(
@@ -211,13 +220,13 @@ class _TopicControlCard extends StatelessWidget {
                 label: Text(sending ? 'Sending…' : 'Send fan command'),
               ),
             ],
-            if (sending) ...[
+            if (!isThermometer && sending) ...[
               const SizedBox(height: 8),
               const Text(
                 'Waiting for broker acknowledgement…',
                 style: TextStyle(fontSize: 12, color: AppTheme.muted),
               ),
-            ] else if (!canSend) ...[
+            ] else if (!isThermometer && !canSend) ...[
               const SizedBox(height: 8),
               const Text(
                 'Connect to the broker with publish permission to use this control.',

@@ -10,7 +10,7 @@ import '../../../workspace/data/workspace_models.dart';
 import '../../data/template_repository.dart';
 import '../../domain/entities/iot_template.dart';
 
-enum TopicControlType { switchControl, fan }
+enum TopicControlType { switchControl, fan, thermometer }
 
 class TemplateController extends ChangeNotifier {
   TemplateController(
@@ -406,9 +406,25 @@ class TemplateController extends ChangeNotifier {
   }
 
   TopicControlType controlTypeFor(TopicRule rule) =>
-      preferencesFor(rule)['controlType'] == 'fan'
-      ? TopicControlType.fan
-      : TopicControlType.switchControl;
+      switch (preferencesFor(rule)['controlType']) {
+        'fan' => TopicControlType.fan,
+        'thermometer' => TopicControlType.thermometer,
+        _ => TopicControlType.switchControl,
+      };
+
+  double thermometerValueFor(TopicRule rule, String key) {
+    final live = latestFor(rule);
+    final stored = latestStoredFor(rule);
+    final payload = live != null ? _decode(live.payload) : stored?['payload'];
+    if (payload is! Map) return 0;
+    final value = payload[key];
+    final number = value is num
+        ? value.toDouble()
+        : value is String
+        ? double.tryParse(value)
+        : null;
+    return number?.isFinite == true ? number! : 0;
+  }
 
   int fanRangeFor(TopicRule rule) {
     return _topicRanges[rule.id] ?? 5;
@@ -420,7 +436,11 @@ class TemplateController extends ChangeNotifier {
   ) async {
     if (selectedRule?.id != rule.id) selectRule(rule);
     await _saveRule({
-      'controlType': type == TopicControlType.fan ? 'fan' : 'switch',
+      'controlType': switch (type) {
+        TopicControlType.fan => 'fan',
+        TopicControlType.thermometer => 'thermometer',
+        TopicControlType.switchControl => 'switch',
+      },
     });
     _notify();
   }
