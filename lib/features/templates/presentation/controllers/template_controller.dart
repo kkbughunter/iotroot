@@ -42,8 +42,7 @@ class TemplateController extends ChangeNotifier {
       busy = false,
       loadingRules = false,
       connecting = false,
-      sending = false;
-  bool loadingHistory = false;
+      loadingHistory = false;
   bool storedDeviceOnly = false;
   bool needsClientSetup = false;
   int _deviceSelection = 0, _connection = 0;
@@ -64,6 +63,7 @@ class TemplateController extends ChangeNotifier {
   final Map<int, List<BrokerMessage>> _readings = {};
   final Map<int, bool> _topicPower = {};
   final Map<int, int> _topicRanges = {};
+  final Set<int> _sendingTopicIds = {};
   // Newest stored message per stored topic, shown on the home cards.
   final Map<int, Map<String, dynamic>> _latestStored = {};
   Map<String, dynamic> _preferences = {};
@@ -81,12 +81,12 @@ class TemplateController extends ChangeNotifier {
       connectionStatus == 'Connected' ||
       connectionStatus.startsWith('Subscription rejected:');
   bool get reconnecting => connectionStatus == 'Reconnecting';
-  bool get canSend =>
-      connected &&
-      !sending &&
-      !connecting &&
-      selectedRule?.canPublish == true &&
-      matchesTopic(selectedRule!.topic, publishTopic);
+  bool get sending => _sendingTopicIds.isNotEmpty;
+  bool get canSend {
+    final rule = selectedRule;
+    return rule != null && canSendTopic(rule);
+  }
+
   bool get hasMoreHistory => _storedPage < _storedPages;
   String get topic => selectedRule?.topic ?? 'Select a topic';
   BrokerMessage? get latestMessage =>
@@ -213,7 +213,7 @@ class TemplateController extends ChangeNotifier {
     _storedPage = 0;
     _storedPages = 0;
     selectedRule = null;
-    sending = false;
+    _sendingTopicIds.clear();
     rules = [];
     _readings.clear();
     _topicPower.clear();
@@ -465,11 +465,12 @@ class TemplateController extends ChangeNotifier {
       (rule.wildcard ? '' : rule.topic);
   bool canSendTopic(TopicRule rule) =>
       connected &&
-      !sending &&
+      !isSendingTopic(rule) &&
       !connecting &&
       rules.contains(rule) &&
       rule.canPublish &&
       matchesTopic(rule.topic, destinationFor(rule));
+  bool isSendingTopic(TopicRule rule) => _sendingTopicIds.contains(rule.id);
   void openTopic(TopicRule rule) {
     selectRule(rule);
   }
@@ -586,7 +587,7 @@ class TemplateController extends ChangeNotifier {
               controlsFor(rule)[control.id]!,
             ),
         });
-    sending = true;
+    _sendingTopicIds.add(rule.id);
     error = null;
     _notify();
     try {
@@ -613,7 +614,7 @@ class TemplateController extends ChangeNotifier {
       return false;
     } finally {
       if (generation == _workspace && deviceSelection == _deviceSelection) {
-        sending = false;
+        _sendingTopicIds.remove(rule.id);
         _notify();
       }
     }
@@ -881,7 +882,7 @@ class TemplateController extends ChangeNotifier {
     pageIndex = 0;
     busy = false;
     connecting = false;
-    sending = false;
+    _sendingTopicIds.clear();
     loadingRules = false;
     loadingHistory = false;
   }

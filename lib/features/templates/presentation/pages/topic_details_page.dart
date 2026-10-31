@@ -124,6 +124,7 @@ class _TopicControlCard extends StatelessWidget {
     final enabled = controller.powerFor(rule);
     final range = controller.fanRangeFor(rule);
     final canSend = controller.canSendTopic(rule);
+    final sending = controller.isSendingTopic(rule);
 
     return Card(
       child: Padding(
@@ -207,12 +208,16 @@ class _TopicControlCard extends StatelessWidget {
                     ? () => controller.sendFanCommand(rule, enabled, range)
                     : null,
                 icon: const Icon(Icons.send_rounded),
-                label: Text(
-                  controller.sending ? 'Sending…' : 'Send fan command',
-                ),
+                label: Text(sending ? 'Sending…' : 'Send fan command'),
               ),
             ],
-            if (!canSend) ...[
+            if (sending) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Waiting for broker acknowledgement…',
+                style: TextStyle(fontSize: 12, color: AppTheme.muted),
+              ),
+            ] else if (!canSend) ...[
               const SizedBox(height: 8),
               const Text(
                 'Connect to the broker with publish permission to use this control.',

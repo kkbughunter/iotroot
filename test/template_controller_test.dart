@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -192,6 +193,35 @@ void main() {
     expect(controller.controlValues['brightness'], 70.0);
     expect(await controller.sendTopicCommand(controller.rules[1]), isFalse);
   });
+
+  test(
+    'publishing disables only the topic waiting for acknowledgement',
+    () async {
+      final first = controller.rules.first;
+      final other = controller.rules.last;
+      controller.selectRule(other);
+      controller.setPublishTopic('commands/light');
+      await controller.connect('secret', controller.brokerSettings);
+
+      final acknowledgement = Completer<void>();
+      broker.publishCompleter = acknowledgement;
+      final firstPublish = controller.sendTopicCommand(first);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.isSendingTopic(first), isTrue);
+      expect(controller.canSendTopic(first), isFalse);
+      expect(controller.isSendingTopic(other), isFalse);
+      expect(controller.canSendTopic(other), isTrue);
+
+      broker.publishCompleter = null;
+      expect(await controller.sendTopicCommand(other), isTrue);
+      expect(controller.isSendingTopic(first), isTrue);
+
+      acknowledgement.complete();
+      expect(await firstPublish, isTrue);
+      expect(controller.isSendingTopic(first), isFalse);
+    },
+  );
 
   test(
     'topic control type is saved and fan publishes status and range',

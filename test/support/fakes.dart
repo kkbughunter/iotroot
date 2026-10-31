@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -101,6 +102,7 @@ class FakeBroker extends BrokerConnection {
   int disconnects = 0;
   final published = <String, String>{};
   final retained = <String, bool>{};
+  Completer<void>? publishCompleter;
   @override
   Future<void> connect(
     Device device,
@@ -123,8 +125,10 @@ class FakeBroker extends BrokerConnection {
     bool retain = true,
   }) async {
     if (failPublish) throw StateError('Broker unavailable');
+    final completer = publishCompleter;
     published[topic] = payload;
     retained[topic] = retain;
+    await completer?.future;
   }
 
   @override

@@ -14,6 +14,8 @@ class CommandPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final template = controller.selectedTemplate;
+    final rule = controller.selectedRule;
+    final sending = rule != null && controller.isSendingTopic(rule);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(22),
@@ -103,9 +105,7 @@ class CommandPanel extends StatelessWidget {
                       },
                 icon: const Icon(Icons.send_rounded, size: 18),
                 label: Text(
-                  controller.sending
-                      ? 'Waiting for acknowledgement…'
-                      : 'Send command',
+                  sending ? 'Waiting for acknowledgement…' : 'Send command',
                 ),
               ),
             ),
