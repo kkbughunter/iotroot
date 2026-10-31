@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
 
+import 'background_connection_keeper.dart';
 import 'workspace_models.dart';
 
 abstract class BrokerConnection {
@@ -107,6 +108,7 @@ class MqttBrokerConnection extends BrokerConnection {
       _published = client.published?.listen((message) {
         _pending.remove(message.variableHeader?.messageIdentifier)?.complete();
       });
+      await BackgroundConnectionKeeper.start();
       onStatus?.call('Connected');
       for (final topic
           in rules.where((r) => r.canSubscribe).map((r) => r.topic).toSet()) {
@@ -186,5 +188,6 @@ class MqttBrokerConnection extends BrokerConnection {
     _client?.autoReconnect = false;
     _client?.disconnect();
     _client = null;
+    unawaited(BackgroundConnectionKeeper.stop());
   }
 }

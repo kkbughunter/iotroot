@@ -14,18 +14,30 @@ class IotRootApp extends StatefulWidget {
   State<IotRootApp> createState() => _IotRootAppState();
 }
 
-class _IotRootAppState extends State<IotRootApp> {
+class _IotRootAppState extends State<IotRootApp> with WidgetsBindingObserver {
   late final TemplateController _controller;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = widget.controller ?? TemplateController(TemplateRepository());
     _controller.initialize();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Background states intentionally keep MQTT alive. Detached means the
+    // Flutter view has been removed, such as when the Android task is swiped
+    // away, so this is the one lifecycle transition that closes the session.
+    if (state == AppLifecycleState.detached) {
+      _controller.disconnect();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     super.dispose();
   }
