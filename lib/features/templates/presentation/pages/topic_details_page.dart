@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../workspace/data/workspace_models.dart';
@@ -128,6 +128,7 @@ class _TopicControlCard extends StatelessWidget {
     final canSend = controller.canSendTopic(rule);
     final sending = controller.isSendingTopic(rule);
     final isThermometer = type == TopicControlType.thermometer;
+    final isRawText = type == TopicControlType.rawText;
 
     return Card(
       child: Padding(
@@ -154,7 +155,9 @@ class _TopicControlCard extends StatelessWidget {
               label: const Text('Choose control layout'),
             ),
             const SizedBox(height: 12),
-            if (isThermometer)
+            if (isRawText)
+              _RawTextComposer(controller: controller)
+            else if (isThermometer)
               ThermometerReadings(controller: controller, rule: rule)
             else
               SwitchListTile.adaptive(
@@ -203,13 +206,13 @@ class _TopicControlCard extends StatelessWidget {
                 label: Text(sending ? 'Sending…' : 'Send fan command'),
               ),
             ],
-            if (!isThermometer && sending) ...[
+            if (!isThermometer && !isRawText && sending) ...[
               const SizedBox(height: 8),
               const Text(
                 'Waiting for broker acknowledgement…',
                 style: TextStyle(fontSize: 12, color: AppTheme.muted),
               ),
-            ] else if (!isThermometer && !canSend) ...[
+            ] else if (!isThermometer && !isRawText && !canSend) ...[
               const SizedBox(height: 8),
               const Text(
                 'Connect to the broker with publish permission to use this control.',
@@ -219,6 +222,65 @@ class _TopicControlCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _RawTextComposer extends StatefulWidget {
+  const _RawTextComposer({required this.controller});
+
+  final TemplateController controller;
+
+  @override
+  State<_RawTextComposer> createState() => _RawTextComposerState();
+}
+
+class _RawTextComposerState extends State<_RawTextComposer> {
+  final _message = TextEditingController();
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final sent = await widget.controller.sendRawText(_message.text);
+    if (!mounted || !sent) return;
+    _message.clear();
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canSend =
+        widget.controller.canSend && _message.text.trim().isNotEmpty;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: TextField(
+            key: const Key('raw-text-message'),
+            controller: _message,
+            minLines: 1,
+            maxLines: 4,
+            textInputAction: TextInputAction.send,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => canSend ? _send() : null,
+            decoration: const InputDecoration(
+              hintText: 'Type a message',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton.filled(
+          key: const Key('send-raw-text'),
+          tooltip: 'Send message',
+          onPressed: canSend ? _send : null,
+          icon: const Icon(Icons.send_rounded),
+        ),
+      ],
     );
   }
 }

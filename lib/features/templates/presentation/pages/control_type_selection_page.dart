@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../workspace/data/workspace_models.dart';
@@ -23,6 +23,7 @@ class _ControlTypeSelectionPageState extends State<ControlTypeSelectionPage> {
   static const _types = <TopicControlType>[
     TopicControlType.switchControl,
     TopicControlType.fan,
+    TopicControlType.rawText,
   ];
 
   TopicControlType? _selected;
@@ -92,22 +93,16 @@ class _ControlTypeSelectionPageState extends State<ControlTypeSelectionPage> {
                         ),
                         const SizedBox(height: 14),
                         if (wide)
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 14,
                             children: [
-                              Expanded(child: cards[0]),
-                              const SizedBox(width: 16),
-                              Expanded(child: cards[1]),
+                              for (final card in cards)
+                                SizedBox(width: 390, child: card),
                             ],
                           )
                         else
-                          Column(
-                            children: [
-                              cards[0],
-                              const SizedBox(height: 14),
-                              cards[1],
-                            ],
-                          ),
+                          Column(spacing: 14, children: cards),
                       ],
                     ),
                   ),
@@ -207,12 +202,22 @@ class _ControlPreviewCard extends StatelessWidget {
   final VoidCallback onTap;
 
   bool get _isFan => type == TopicControlType.fan;
-  String get _label => _isFan ? 'Fan' : 'Light';
+  bool get _isRawText => type == TopicControlType.rawText;
+  String get _label => _isFan
+      ? 'Fan'
+      : _isRawText
+      ? 'Send message'
+      : 'Light';
   String get _description => _isFan
       ? 'Power control with a 0–10 speed slider.'
+      : _isRawText
+      ? 'Send plain text directly to this topic.'
       : 'Simple power control for lights, plugs, and switches.';
-  IconData get _icon =>
-      _isFan ? Icons.mode_fan_off_rounded : Icons.lightbulb_outline_rounded;
+  IconData get _icon => _isFan
+      ? Icons.mode_fan_off_rounded
+      : _isRawText
+      ? Icons.send_rounded
+      : Icons.lightbulb_outline_rounded;
 
   @override
   Widget build(BuildContext context) {
@@ -261,6 +266,8 @@ class _ControlPreviewCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: _isFan
                               ? const Color(0xFFE2F1EC)
+                              : _isRawText
+                              ? const Color(0xFFE0EEFF)
                               : const Color(0xFFFFE9C8),
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -268,6 +275,8 @@ class _ControlPreviewCard extends StatelessWidget {
                           _icon,
                           color: _isFan
                               ? AppTheme.green
+                              : _isRawText
+                              ? const Color(0xFF1769AA)
                               : const Color(0xFFA85A00),
                         ),
                       ),
@@ -309,6 +318,7 @@ class _ControlPreviewCard extends StatelessWidget {
                     controller: controller,
                     rule: rule,
                     isFan: _isFan,
+                    isRawText: _isRawText,
                   ),
                 ],
               ),
@@ -325,18 +335,28 @@ class _HomeCardPreview extends StatelessWidget {
     required this.controller,
     required this.rule,
     required this.isFan,
+    required this.isRawText,
   });
 
   final TemplateController controller;
   final TopicRule rule;
   final bool isFan;
+  final bool isRawText;
 
   @override
   Widget build(BuildContext context) {
     final power = controller.powerFor(rule);
     final range = controller.fanRangeFor(rule);
-    final accent = isFan ? const Color(0xFFE7F3ED) : const Color(0xFFFFF1DC);
-    final accentStrong = isFan ? AppTheme.green : const Color(0xFFA85A00);
+    final accent = isFan
+        ? const Color(0xFFE7F3ED)
+        : isRawText
+        ? const Color(0xFFE6F1FF)
+        : const Color(0xFFFFF1DC);
+    final accentStrong = isFan
+        ? AppTheme.green
+        : isRawText
+        ? const Color(0xFF1769AA)
+        : const Color(0xFFA85A00);
 
     return Container(
       height: 140,
@@ -361,6 +381,8 @@ class _HomeCardPreview extends StatelessWidget {
                 child: Icon(
                   isFan
                       ? Icons.mode_fan_off_rounded
+                      : isRawText
+                      ? Icons.send_rounded
                       : Icons.lightbulb_outline_rounded,
                   size: 19,
                   color: accentStrong,
@@ -377,7 +399,19 @@ class _HomeCardPreview extends StatelessWidget {
             ],
           ),
           const Spacer(),
-          if (isFan)
+          if (isRawText)
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Type a message…',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                Icon(Icons.send_rounded, color: accentStrong),
+              ],
+            )
+          else if (isFan)
             Row(
               children: [
                 Expanded(

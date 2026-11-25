@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../workspace/data/workspace_models.dart';
@@ -84,8 +84,10 @@ class _TopicDashboardPageState extends State<TopicDashboardPage> {
                     for (final rule in controller.rules)
                       SizedBox(
                         width:
-                            controller.controlTypeFor(rule) ==
-                                    TopicControlType.fan &&
+                            (controller.controlTypeFor(rule) ==
+                                        TopicControlType.fan ||
+                                    controller.controlTypeFor(rule) ==
+                                        TopicControlType.rawText) &&
                                 columns > 1
                             ? cardWidth * 2 + gap
                             : cardWidth,
@@ -125,14 +127,19 @@ class _TopicCard extends StatelessWidget {
     final type = controller.controlTypeFor(rule);
     final isFan = type == TopicControlType.fan;
     final isThermometer = type == TopicControlType.thermometer;
+    final isRawText = type == TopicControlType.rawText;
     final range = controller.fanRangeFor(rule);
     final accent = isThermometer
         ? const Color(0xFFDDF2F0)
+        : isRawText
+        ? const Color(0xFFE6F1FF)
         : rule.isStored
         ? const Color(0xFFDDF3E5)
         : const Color(0xFFFFE8CC);
     final accentStrong = isThermometer
         ? const Color(0xFF287A6B)
+        : isRawText
+        ? const Color(0xFF1769AA)
         : rule.isStored
         ? const Color(0xFF287A4B)
         : const Color(0xFFAD5B00);
@@ -169,6 +176,8 @@ class _TopicCard extends StatelessWidget {
                           ? Icons.thermostat_rounded
                           : isFan
                           ? Icons.mode_fan_off_rounded
+                          : isRawText
+                          ? Icons.send_rounded
                           : Icons.lightbulb_outline_rounded,
                       size: 17,
                       color: accentStrong,
@@ -185,7 +194,14 @@ class _TopicCard extends StatelessWidget {
                 ],
               ),
 
-              if (!isThermometer && !isFan)
+              if (isRawText)
+                Expanded(
+                  child: _DashboardRawTextComposer(
+                    controller: controller,
+                    rule: rule,
+                  ),
+                )
+              else if (!isThermometer && !isFan)
                 Expanded(
                   child: Center(
                     child: Text(
@@ -202,7 +218,9 @@ class _TopicCard extends StatelessWidget {
                 )
               else
                 const Spacer(),
-              if (isThermometer)
+              if (isRawText)
+                const SizedBox.shrink()
+              else if (isThermometer)
                 ThermometerReadings(
                   controller: controller,
                   rule: rule,
@@ -264,6 +282,76 @@ class _TopicCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DashboardRawTextComposer extends StatefulWidget {
+  const _DashboardRawTextComposer({
+    required this.controller,
+    required this.rule,
+  });
+
+  final TemplateController controller;
+  final TopicRule rule;
+
+  @override
+  State<_DashboardRawTextComposer> createState() =>
+      _DashboardRawTextComposerState();
+}
+
+class _DashboardRawTextComposerState extends State<_DashboardRawTextComposer> {
+  final _message = TextEditingController();
+  String _text = '';
+
+  @override
+  void dispose() {
+    _message.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final sent = await widget.controller.sendRawTextFor(
+      widget.rule,
+      _message.text,
+    );
+    if (!mounted || !sent) return;
+    _message.clear();
+    setState(() => _text = '');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canSend =
+        widget.controller.canSendTopic(widget.rule) && _text.trim().isNotEmpty;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              key: ValueKey('dashboard-raw-text:${widget.rule.id}'),
+              controller: _message,
+              maxLines: 1,
+              textInputAction: TextInputAction.send,
+              onChanged: (text) => setState(() => _text = text),
+              onSubmitted: (_) => canSend ? _send() : null,
+              decoration: const InputDecoration(
+                hintText: 'Type a message',
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton.filled(
+            key: ValueKey('dashboard-send-raw-text:${widget.rule.id}'),
+            tooltip: 'Send message',
+            onPressed: canSend ? _send : null,
+            icon: const Icon(Icons.send_rounded),
+          ),
+        ],
       ),
     );
   }

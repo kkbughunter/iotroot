@@ -77,6 +77,34 @@ void main() {
     controller.setPublishTopic('commands/light');
     expect(controller.canSend, isTrue);
   });
+
+  test('raw text sends without retaining or recording the message', () async {
+    await controller.connect('mqtt-secret', controller.brokerSettings);
+
+    expect(await controller.sendRawText('turn on'), isTrue);
+
+    expect(broker.published['room/climate'], 'turn on');
+    expect(broker.retained['room/climate'], isFalse);
+    expect(controller.events, isEmpty);
+    expect(controller.storedMessages, isEmpty);
+  });
+  test(
+    'raw text can be sent for a dashboard topic without changing selection',
+    () async {
+      final selected = controller.rules.first;
+      final destination = controller.rules.last;
+      controller.selectRule(destination);
+      controller.setPublishTopic('commands/message');
+      controller.selectRule(selected);
+      await controller.connect('mqtt-secret', controller.brokerSettings);
+
+      expect(await controller.sendRawTextFor(destination, 'hello'), isTrue);
+
+      expect(controller.selectedRule, selected);
+      expect(broker.published['commands/message'], 'hello');
+      expect(broker.retained['commands/message'], isFalse);
+    },
+  );
   test(
     'the app device is the one whose username matches the account email',
     () async {

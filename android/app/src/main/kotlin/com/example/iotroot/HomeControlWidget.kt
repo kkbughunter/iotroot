@@ -91,22 +91,31 @@ class HomeControlWidget : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_empty, android.view.View.VISIBLE)
             } else {
                 views.setViewVisibility(R.id.widget_empty, android.view.View.GONE)
-                val slots = listOf(
-                    R.id.widget_slot_1,
-                    R.id.widget_slot_2,
-                    R.id.widget_slot_3,
-                    R.id.widget_slot_4,
-                )
-                config.topics.chunked(4).forEachIndexed { rowIndex, topics ->
-                    val row = RemoteViews(context.packageName, R.layout.home_control_widget_row)
-                    topics.forEachIndexed { columnIndex, topic ->
-                        val topicIndex = rowIndex * 4 + columnIndex
-                        row.addView(
-                            slots[columnIndex],
-                            topicTile(context, widgetId, topicIndex, topic),
-                        )
-                    }
+                if (config.topics.size == 1) {
+                    val row = RemoteViews(context.packageName, R.layout.home_control_widget_single_row)
+                    row.addView(
+                        R.id.widget_single_slot,
+                        topicTile(context, widgetId, 0, config.topics.single()),
+                    )
                     views.addView(R.id.widget_topic_list, row)
+                } else {
+                    val slots = listOf(
+                        R.id.widget_slot_1,
+                        R.id.widget_slot_2,
+                        R.id.widget_slot_3,
+                        R.id.widget_slot_4,
+                    )
+                    config.topics.chunked(4).forEachIndexed { rowIndex, topics ->
+                        val row = RemoteViews(context.packageName, R.layout.home_control_widget_row)
+                        topics.forEachIndexed { columnIndex, topic ->
+                            val topicIndex = rowIndex * 4 + columnIndex
+                            row.addView(
+                                slots[columnIndex],
+                                topicTile(context, widgetId, topicIndex, topic),
+                            )
+                        }
+                        views.addView(R.id.widget_topic_list, row)
+                    }
                 }
             }
 

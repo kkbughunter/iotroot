@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show ThemeMode;
+import 'package:material_ui/material_ui.dart' show ThemeMode;
 
 import '../../../../core/api_client.dart';
 import '../../../home_widget/home_widget_bridge.dart';
@@ -11,7 +11,7 @@ import '../../../workspace/data/workspace_models.dart';
 import '../../data/template_repository.dart';
 import '../../domain/entities/iot_template.dart';
 
-enum TopicControlType { switchControl, fan, thermometer }
+enum TopicControlType { switchControl, fan, thermometer, rawText }
 
 class TemplateController extends ChangeNotifier {
   TemplateController(
@@ -412,6 +412,7 @@ class TemplateController extends ChangeNotifier {
       switch (preferencesFor(rule)['controlType']) {
         'fan' => TopicControlType.fan,
         'thermometer' => TopicControlType.thermometer,
+        'rawText' => TopicControlType.rawText,
         _ => TopicControlType.switchControl,
       };
 
@@ -442,6 +443,7 @@ class TemplateController extends ChangeNotifier {
       'controlType': switch (type) {
         TopicControlType.fan => 'fan',
         TopicControlType.thermometer => 'thermometer',
+        TopicControlType.rawText => 'rawText',
         TopicControlType.switchControl => 'switch',
       },
     });
@@ -663,6 +665,45 @@ class TemplateController extends ChangeNotifier {
     final rule = selectedRule;
     if (rule == null) return false;
     return sendTopicCommand(rule, rawPayload: rawPayload);
+  }
+
+  Future<bool> sendRawText(String text) async {
+    final rule = selectedRule;
+    if (rule == null) {
+      error = 'Connect and enter a message to send.';
+      _notify();
+      return false;
+    }
+    return sendRawTextFor(rule, text);
+  }
+
+  Future<bool> sendRawTextFor(TopicRule rule, String text) async {
+    if (text.trim().isEmpty || !canSendTopic(rule)) {
+      error = 'Connect and enter a message to send.';
+      _notify();
+      return false;
+    }
+    final generation = _workspace;
+    final deviceSelection = _deviceSelection;
+    _sendingTopicIds.add(rule.id);
+    error = null;
+    _notify();
+    try {
+      await broker.publish(destinationFor(rule), text, retain: false);
+      return generation == _workspace &&
+          deviceSelection == _deviceSelection &&
+          !_disposed;
+    } catch (e) {
+      if (generation == _workspace && deviceSelection == _deviceSelection) {
+        error = _message(e);
+      }
+      return false;
+    } finally {
+      if (generation == _workspace && deviceSelection == _deviceSelection) {
+        _sendingTopicIds.remove(rule.id);
+        _notify();
+      }
+    }
   }
 
   Future<bool> sendTopicCommand(TopicRule rule, {String? rawPayload}) async {

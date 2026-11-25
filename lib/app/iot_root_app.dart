@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../features/templates/data/template_repository.dart';
 import '../features/templates/presentation/controllers/template_controller.dart';

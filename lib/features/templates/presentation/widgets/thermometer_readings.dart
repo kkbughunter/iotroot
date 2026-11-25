@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../workspace/data/workspace_models.dart';
 import '../controllers/template_controller.dart';

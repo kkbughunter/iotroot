@@ -38,6 +38,7 @@ dependencies:
   mqtt_client: ^10.14.0
   flutter_secure_storage: ^11.2.0
 
+  material_ui: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

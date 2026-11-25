@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:iotroot/app/iot_root_app.dart';
 import 'package:iotroot/features/templates/data/template_repository.dart';
@@ -7,6 +7,59 @@ import 'package:iotroot/features/templates/presentation/controllers/template_con
 import 'support/fakes.dart';
 
 void main() {
+  testWidgets('text control uses a wide dashboard card with inline sending', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final broker = FakeBroker();
+    final controller = TemplateController(
+      TemplateRepository(),
+      api: fixtureApi(),
+      broker: broker,
+    );
+    await tester.pumpWidget(IotRootApp(controller: controller));
+    await tester.pumpAndSettle();
+    await controller.login('https://example.com', 'user@example.com', 'secret');
+    final rule = controller.rules.first;
+    await controller.setTopicControlType(rule, TopicControlType.rawText);
+    await controller.connect('mqtt-secret', controller.brokerSettings);
+    expect(controller.canSendTopic(rule), isTrue);
+
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getSize(find.byKey(const ValueKey('topic-card:11'))).width,
+      greaterThan(300),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('dashboard-raw-text:11')),
+      'hello',
+    );
+    await tester.pump();
+    expect(controller.canSendTopic(rule), isTrue);
+    expect(
+      tester
+          .widget<IconButton>(
+            find.byKey(const ValueKey('dashboard-send-raw-text:11')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    await tester.tap(find.byKey(const ValueKey('dashboard-send-raw-text:11')));
+    await tester.pumpAndSettle();
+
+    expect(broker.published['room/climate'], 'hello');
+    expect(find.text('Type a message'), findsOneWidget);
+
+    final card = find.byKey(const ValueKey('topic-card:11'));
+    await tester.tapAt(tester.getTopLeft(card) + const Offset(12, 12));
+    await tester.pumpAndSettle();
+    expect(find.text('Topic details'), findsWidgets);
+  });
+
   for (final width in [360.0, 390.0, 1200.0]) {
     testWidgets(
       'login, topic template, live payload and activity fit width $width',
